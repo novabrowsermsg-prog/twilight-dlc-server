@@ -5,8 +5,8 @@
   "mods": [
     {
       "name": "twilight-dlc",
-      "url": "https://ВАШ-СЕРВИС.onrender.com/mods/twilight-dlc-1.0.0.jar",
-      "sha1": "ХЭШ_ФАЙЛА_МОДА"
+      "url": "https://twilight-dlc-server.onrender.com/mods/twilight-dlc-1.0.0.jar",
+      "sha1": "a39bdb3f45cf2efd325fe659bdd1f0c6b7213db1"
     }
   ],
   "servers": [
