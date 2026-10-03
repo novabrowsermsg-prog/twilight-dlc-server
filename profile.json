@@ -1,0 +1,18 @@
+{
+  "mcVersion": "1.21.4",
+  "loader": "fabric",
+  "loaderVersion": "0.16.9",
+  "mods": [
+    {
+      "name": "twilight-dlc",
+      "url": "https://ВАШ-СЕРВИС.onrender.com/mods/twilight-dlc-1.0.0.jar",
+      "sha1": "ХЭШ_ФАЙЛА_МОДА"
+    }
+  ],
+  "servers": [
+    {
+      "ip": "play.twilightdlc.ru",
+      "lable": "twilightDLC"
+    }
+  ]
+}
