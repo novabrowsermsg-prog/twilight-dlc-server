@@ -9,10 +9,8 @@ const PORT = process.env.PORT || 3000;
 
 const MODS_DIR = path.join(__dirname, "mods");
 const PUBLIC_DIR = path.join(__dirname, "public");
+const BASE_URL = process.env.BASE_URL || "https://twilight-dlc-server.onrender.com";
 
-// ------------------------------------------------------------------
-// Middleware
-// ------------------------------------------------------------------
 app.use(express.json({ limit: "5mb" }));
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -22,25 +20,26 @@ app.use((req, res, next) => {
   next();
 });
 
-// ------------------------------------------------------------------
-// Статика: сайт
-// ------------------------------------------------------------------
 app.use(express.static(PUBLIC_DIR));
 
-// ------------------------------------------------------------------
-// Профиль сборки (для лаунчера)
-// ------------------------------------------------------------------
+// ---------- Офлайн UUID (как в лаунчере) ----------
+function offlinePlayerId(name) {
+  const hash = crypto.createHash("md5").update(`OfflinePlayer:${name}`, "utf8").digest();
+  hash[6] = (hash[6] & 0x0f) | 0x30;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+  const hex = hash.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+// ---------- Профиль сборки ----------
 app.get("/minecraft/api/v1/profile", (req, res) => {
-  const profilePath = path.join(__dirname, "profile.json");
-  fs.readFile(profilePath, "utf8", (err, data) => {
+  fs.readFile(path.join(__dirname, "profile.json"), "utf8", (err, data) => {
     if (err) return res.status(404).json({ error: "Profile not found" });
     res.json(JSON.parse(data));
   });
 });
 
-// ------------------------------------------------------------------
-// Манифест модов
-// ------------------------------------------------------------------
+// ---------- Манифест модов ----------
 function sha1File(filePath) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash("sha1");
@@ -56,9 +55,8 @@ async function walkMods(dir, base = dir) {
   const entries = await fs.promises.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      Object.assign(result, await walkMods(full, base));
-    } else if (entry.isFile()) {
+    if (entry.isDirectory()) Object.assign(result, await walkMods(full, base));
+    else if (entry.isFile()) {
       const rel = path.relative(base, full).split(path.sep).join("/");
       const key = `mods/${rel}`;
       const stat = await fs.promises.stat(full);
@@ -80,18 +78,14 @@ app.get("/minecraft/api/v1/manifest", async (req, res) => {
 
 app.get("/minecraft/api/v1/files/mods/:name", (req, res) => {
   const name = req.params.name;
-  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+  if (name.includes("..") || name.includes("/") || name.includes("\\"))
     return res.status(400).json({ error: "Invalid file" });
-  }
   const filePath = path.join(MODS_DIR, name);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
   res.sendFile(filePath);
 });
 
-// ------------------------------------------------------------------
-// AUTH API
-// ------------------------------------------------------------------
-
+// ---------- AUTH ----------
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -104,20 +98,13 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-// Регистрация
 app.post("/api/auth/register", (req, res) => {
   const { nick, password } = req.body || {};
   if (!nick || !password) return res.status(400).json({ error: "nick и password обязательны" });
-  if (!/^[A-Za-z0-9_]{3,16}$/.test(nick)) {
-    return res.status(400).json({ error: "Ник: 3–16 символов, латиница, цифры и _" });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ error: "Пароль минимум 6 символов" });
-  }
+  if (!/^[A-Za-z0-9_]{3,16}$/.test(nick)) return res.status(400).json({ error: "Ник: 3–16 символов" });
+  if (password.length < 6) return res.status(400).json({ error: "Пароль минимум 6 символов" });
   const key = nick.toLowerCase();
-  if (db.users[key]) {
-    return res.status(409).json({ error: "Ник уже занят" });
-  }
+  if (db.users[key]) return res.status(409).json({ error: "Ник уже занят" });
   const salt = crypto.randomBytes(16).toString("hex");
   const user = {
     nick,
@@ -136,29 +123,25 @@ app.post("/api/auth/register", (req, res) => {
   res.json({ token, user: { nick, uid: user.uid, bio: "", plan: "Free", skin: null } });
 });
 
-// Логин
 app.post("/api/auth/login", (req, res) => {
   const { nick, password } = req.body || {};
   if (!nick || !password) return res.status(400).json({ error: "nick и password обязательны" });
   const key = nick.toLowerCase();
   const user = db.users[key];
   if (!user) return res.status(401).json({ error: "Неверный ник или пароль" });
-  if (hashPassword(user.salt, password) !== user.hash) {
+  if (hashPassword(user.salt, password) !== user.hash)
     return res.status(401).json({ error: "Неверный ник или пароль" });
-  }
   const token = makeToken();
   db.sessions[token] = { nick: key, created: Date.now() };
   save();
   res.json({ token, user: { nick: user.nick, uid: user.uid, bio: user.bio, plan: user.plan, skin: user.skin } });
 });
 
-// Проверка сессии
 app.get("/api/auth/me", authMiddleware, (req, res) => {
   const u = req.user;
   res.json({ nick: u.nick, uid: u.uid, bio: u.bio, plan: u.plan, skin: u.skin });
 });
 
-// Обновить профиль (bio, skin)
 app.put("/api/auth/profile", authMiddleware, (req, res) => {
   const { bio, skin } = req.body || {};
   if (typeof bio === "string") req.user.bio = bio.slice(0, 160);
@@ -167,53 +150,49 @@ app.put("/api/auth/profile", authMiddleware, (req, res) => {
   res.json({ ok: true, bio: req.user.bio, skin: req.user.skin });
 });
 
-// Выход
 app.post("/api/auth/logout", authMiddleware, (req, res) => {
   delete db.sessions[req.token];
   save();
   res.json({ ok: true });
 });
 
-// ------------------------------------------------------------------
-// LAUNCHER AUTH FLOW
-// ------------------------------------------------------------------
+// ---------- Раздача скина как PNG ----------
+app.get("/api/skins/:nick", (req, res) => {
+  const nick = String(req.params.nick).toLowerCase();
+  const user = db.users[nick];
+  if (!user || !user.skin) return res.status(404).send("No skin");
+  const m = /^data:image\/png;base64,(.+)$/.exec(user.skin);
+  if (!m) return res.status(500).send("Bad skin format");
+  const buf = Buffer.from(m[1], "base64");
+  res.setHeader("Content-Type", "image/png");
+  res.setHeader("Cache-Control", "no-cache");
+  res.send(buf);
+});
 
-// Проверка статуса code (вызывает лаунчер)
+// ---------- LAUNCHER FLOW ----------
 app.get("/api/launcher/status", (req, res) => {
   const code = req.query.code;
   if (!code) return res.status(400).json({ error: "code обязателен" });
-
   const entry = db.launcherCodes[code];
   if (!entry) return res.json({ status: "pending" });
-
   if (Date.now() > entry.expiresAt) {
     delete db.launcherCodes[code];
     save();
     return res.json({ status: "expired" });
   }
-
   const user = db.users[entry.nick];
   delete db.launcherCodes[code];
   save();
-
   res.json({
     status: "approved",
     token: entry.token,
-    user: {
-      nick: user.nick,
-      uid: user.uid,
-      plan: user.plan,
-      skin: user.skin,
-    },
+    user: { nick: user.nick, uid: user.uid, plan: user.plan, skin: user.skin },
   });
 });
 
-// Игрок нажал «Разрешить» на сайте
 app.post("/api/launcher/approve", authMiddleware, (req, res) => {
   const { code } = req.body || {};
   if (!code) return res.status(400).json({ error: "code обязателен" });
-
-  // Продлеваем сессию на минуту — достаточно для передачи в лаунчер
   db.launcherCodes[code] = {
     nick: req.user.nick.toLowerCase(),
     token: req.token,
@@ -223,18 +202,58 @@ app.post("/api/launcher/approve", authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
-// ------------------------------------------------------------------
-// Страница /launcher
-// ------------------------------------------------------------------
 app.get("/launcher", (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "launcher.html"));
 });
 
-// ------------------------------------------------------------------
-// Запуск
-// ------------------------------------------------------------------
+// ---------- YGGDRASIL API ----------
+app.get("/api/yggdrasil", (req, res) => {
+  res.json({
+    meta: { serverName: "twilightDLC", implementationName: "twilightDLC-skin-server", implementationVersion: "1.0.0" },
+    skinDomains: [new URL(BASE_URL).hostname],
+    signaturePublickey: "",
+  });
+});
+
+app.get("/api/yggdrasil/sessionserver/session/minecraft/profile/:uuid", (req, res) => {
+  const uuid = req.params.uuid.replace(/-/g, "");
+  const userEntry = Object.values(db.users).find(
+    (u) => offlinePlayerId(u.nick).replace(/-/g, "") === uuid
+  );
+  if (!userEntry) return res.status(404).json({ error: "Profile not found" });
+
+  const hasSkin = !!userEntry.skin;
+  const textures = {
+    timestamp: Date.now(),
+    profileId: offlinePlayerId(userEntry.nick).replace(/-/g, ""),
+    profileName: userEntry.nick,
+    textures: hasSkin
+      ? {
+          SKIN: {
+            url: `${BASE_URL}/api/skins/${encodeURIComponent(userEntry.nick)}`,
+          },
+        }
+      : {},
+  };
+  const value = Buffer.from(JSON.stringify(textures)).toString("base64");
+
+  res.json({
+    id: offlinePlayerId(userEntry.nick).replace(/-/g, ""),
+    name: userEntry.nick,
+    properties: [{ name: "textures", value, signature: "" }],
+  });
+});
+
+app.post("/api/yggdrasil/sessionserver/session/minecraft/join", (req, res) => {
+  res.status(204).end();
+});
+
+app.post("/api/yggdrasil/sessionserver/session/minecraft/hasJoined", (req, res) => {
+  res.json(null);
+});
+
+// ---------- START ----------
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Mods dir: ${MODS_DIR}`);
-  console.log(`Public dir: ${PUBLIC_DIR}`);
+  console.log(`BASE_URL: ${BASE_URL}`);
 });
