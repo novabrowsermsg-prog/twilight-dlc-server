@@ -18,7 +18,6 @@ button,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--v3);outline-offset:3px;border-radius:6px}
 nav{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px clamp(16px,5vw,56px);backdrop-filter:blur(14px);background:rgba(8,5,26,.55);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px;font:500 22px var(--serif);letter-spacing:.06em}
-.brand img{width:30px;height:30px;object-fit:contain}
 .brand b{color:var(--v2)}
 .tabs{display:flex;align-items:center;gap:6px}
 .tab{padding:8px 16px;border-radius:99px;color:var(--mute);font-size:14px;transition:all .25s}
@@ -66,30 +65,16 @@ input:focus{outline:0;border-color:var(--v2);box-shadow:0 0 0 3px rgba(164,92,24
 .auth .btn{width:100%}
 
 .head{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
-.face{position:relative;width:128px;height:128px;flex:none;border-radius:22px;padding:8px;background:radial-gradient(circle,#2a1566,#120c2b);box-shadow:0 0 0 2px var(--v2),0 0 44px rgba(164,92,240,.55);animation:float 5s ease-in-out infinite}
+.face{position:relative;width:128px;height:128px;flex:none;border-radius:22px;padding:8px;background:radial-gradient(circle,#2a1566,#120c2b);box-shadow:0 0 0 2px var(--v2),0 0 44px rgba(164,92,240,.55)}
 .face img{width:100%;height:100%;image-rendering:pixelated;border-radius:10px;display:block}
 .face::after{content:"";position:absolute;right:-5px;bottom:-5px;width:18px;height:18px;border-radius:50%;background:#7dffb0;border:3px solid #120c2b;box-shadow:0 0 12px #7dffb0}
 .who h2{font-size:42px}
 .pill{display:inline-block;padding:3px 14px;border-radius:99px;border:1px solid var(--v2);color:var(--v3);font-size:13px;background:rgba(124,58,237,.2)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:26px 0}
-.stat{padding:16px;border:1px solid var(--line);border-radius:16px}
-.stat span{display:block;font-size:12px;color:var(--mute)}
-.stat b{font:700 24px var(--serif);color:var(--v3)}
-.row{display:flex;gap:10px;flex-wrap:wrap}
 .hint{font-size:13px;color:var(--mute);margin:10px 0 0}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);opacity:0;background:var(--v1);padding:10px 20px;border-radius:99px;font-size:14px;transition:all .3s;pointer-events:none;z-index:100}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 
 .sec{max-width:1040px;margin:0 auto;padding:30px clamp(16px,5vw,40px) 90px}
-.frames{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:26px}
-.frame{margin:0}
-.fr{position:relative;aspect-ratio:16/10;border-radius:20px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(124,58,237,.2),rgba(8,5,26,.85));display:grid;place-items:center;overflow:hidden;transition:border-color .3s,box-shadow .3s,transform .3s}
-.fr::before{content:"";position:absolute;inset:10px;border:1px dashed rgba(164,92,240,.35);border-radius:12px}
-.fr img{width:30%;opacity:.4;margin-top:-14px}
-.fr small{position:absolute;bottom:20px;color:var(--mute);font-size:12px}
-.fr:hover{border-color:var(--v2);box-shadow:0 0 38px rgba(124,58,237,.38);transform:translateY(-4px)}
-.frame h3{margin:14px 0 4px;font:700 17px var(--sans)}
-.frame p{margin:0;color:var(--mute);font-size:14px}
 .end{text-align:center;padding:10px 20px 90px}
 .end h2{margin-bottom:18px}
 .pl{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:start}
@@ -99,16 +84,6 @@ input:focus{outline:0;border-color:var(--v2);box-shadow:0 0 0 3px rgba(164,92,24
 .side button.on{background:rgba(124,58,237,.38);color:#fff;box-shadow:0 0 18px rgba(164,92,240,.3)}
 textarea{width:100%;min-height:96px;resize:vertical;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(8,5,26,.6)}
 textarea:focus{outline:0;border-color:var(--v2);box-shadow:0 0 0 3px rgba(164,92,240,.2)}
-.bio{margin:10px 0 0;color:var(--mute);max-width:420px}
-.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
-.plan{display:flex;flex-direction:column;gap:6px;padding:22px;border:1px solid var(--line);border-radius:20px}
-.plan.hot{border-color:var(--v2);box-shadow:0 0 32px rgba(164,92,240,.3)}
-.plan h3{margin:0;font:700 18px var(--sans)}
-.plan span{color:var(--mute);font-size:13px}
-.plan b{font:700 34px var(--serif);color:var(--v3);margin:8px 0 12px}
-.dl{display:flex;align-items:center;gap:22px;padding:22px;border:1px solid var(--line);border-radius:20px;flex-wrap:wrap}
-.dl img{width:92px;height:92px;object-fit:contain;filter:drop-shadow(0 10px 22px rgba(124,58,237,.6));animation:float 5s ease-in-out infinite}
-.dl h3{margin:0 0 2px;font:700 20px var(--sans)}
 .steps{margin:24px 0 0;padding-left:22px;color:var(--mute)}
 .steps li{margin:6px 0}.steps b{color:var(--v3)}
 @media(max-width:760px){.pl{grid-template-columns:1fr}.side{flex-direction:row;overflow-x:auto;position:static}.side button{white-space:nowrap}}
@@ -131,7 +106,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 .side:before{content:'АККАУНТ';display:block;padding:10px 13px 7px;color:#8974b3;font-size:9px;letter-spacing:.18em;font-weight:700}
 .side button{font-size:13px}
 .profile-banner{display:flex;align-items:center;justify-content:space-between;gap:20px;position:relative;overflow:hidden;padding:25px 28px;margin-bottom:26px;border:1px solid rgba(164,92,240,.25);border-radius:20px;background:radial-gradient(ellipse at 85% 20%,rgba(139,82,230,.27),transparent 38%),linear-gradient(120deg,rgba(68,38,120,.48),rgba(18,11,39,.65))}
-.profile-banner:after{content:'';position:absolute;right:11%;top:-80px;width:190px;height:190px;border:1px solid rgba(193,159,255,.13);border-radius:50%;box-shadow:0 0 0 25px rgba(164,92,240,.035),0 0 0 50px rgba(164,92,240,.025)}
 .profile-banner-copy{position:relative;z-index:1}
 .profile-banner h2{font-size:clamp(27px,3vw,38px);margin:0 0 7px}
 .profile-banner p{margin:0;color:var(--mute);font-size:12px}
@@ -140,7 +114,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 .profile-overview{display:flex;justify-content:space-between;align-items:center;gap:22px;padding:6px 0 24px;border-bottom:1px solid rgba(164,92,240,.15)}
 .profile-identity{display:flex;align-items:center;gap:20px;min-width:0}
 .face{width:92px;height:92px;border-radius:18px;padding:6px;box-shadow:0 0 0 1px var(--v2),0 0 32px rgba(164,92,240,.2);animation:none}
-.face img{width:100%;height:100%;image-rendering:pixelated;border-radius:10px;display:block}
 .who h2{font-size:clamp(28px,3vw,38px);margin-bottom:9px}
 .identity-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .uid{font-size:11px;color:var(--mute)}
@@ -218,7 +191,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 
-  // Дефолтное лицо 8×8, увеличенное до 64×64
+  // Дефолтное лицо 8×8 (увеличено до 64×64)
   var MAP=['HHHHHHHH','HHHHHHHH','HSSSSSSH','SWESSEWS','SSSSSSSS','SSMMMMSS','SSSSSSSS','SSSSSSSS'],
       COL={H:'#2a1458',S:'#e8b79a',W:'#ffffff',E:'#7c3aed',M:'#b5735a'},defFace;
   (function(){
@@ -291,60 +264,68 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     }
   }
 
-  var mode='in', ptab='me';
+  // mode: 'in' | 'up'  | regStep: 'form' | 'code'
+  var mode='in', regStep='form';
+  var pendingReg = null; // { nick, email, password }
 
   function renderProfile(){
     var b = $('pbox');
     renderNav();
+
+    // --- Не авторизован ---
     if (!me) {
+      // Шаг 2: ввод кода
+      if (mode === 'up' && regStep === 'code') {
+        b.innerHTML = '<div class="auth card">'+
+          '<h2>Проверьте почту</h2>'+
+          '<p class="sub">Мы отправили 6-значный код на <b>'+esc(pendingReg.email)+'</b></p>'+
+          '<label for="a-code">Код из письма</label>'+
+          '<input type="text" id="a-code" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="text-align:center;font-size:24px;letter-spacing:8px;">'+
+          '<div class="err" id="err"></div>'+
+          '<button class="btn fill" id="go">Подтвердить</button>'+
+          '<button class="btn ghost" id="back" style="width:100%;margin-top:10px;">Изменить данные</button>'+
+        '</div>';
+
+        $('go').onclick = confirmCode;
+        $('back').onclick = function(){
+          regStep = 'form';
+          renderProfile();
+        };
+        $('a-code').onkeydown = function(e){ if (e.key === 'Enter') confirmCode(); };
+        $('a-code').focus();
+        return;
+      }
+
+      // Шаг 1: форма
       b.innerHTML='<div class="auth card"><h2>Аккаунт</h2><p class="sub">Войди или создай профиль.</p>'+
       '<div class="sw2"><button data-m="in" class="'+(mode==='in'?'on':'')+'">Вход</button><button data-m="up" class="'+(mode==='up'?'on':'')+'">Регистрация</button></div>'+
       '<label for="a-nick">Ник</label><input type="text" id="a-nick" maxlength="16" autocomplete="username" spellcheck="false">'+
-      (mode==='up'?'<label for="a-email">Email</label><input type="email" id="a-email" placeholder="you@example.com">'+
-        '<button type="button" class="btn" id="sendCode" style="margin-top:10px;width:100%">Отправить код на почту</button>'+
-        '<label for="a-code">Код из письма</label><input type="text" id="a-code" placeholder="6 цифр" maxlength="6" inputmode="numeric">':'')+
+      (mode==='up'?'<label for="a-email">Email</label><input type="email" id="a-email" placeholder="you@example.com">':'')+
       '<label for="a-pw">Пароль</label><input type="password" id="a-pw" autocomplete="'+(mode==='in'?'current-password':'new-password')+'">'+
-      '<div class="err" id="err"></div><button class="btn fill" id="go">'+(mode==='in'?'Войти':'Создать аккаунт')+'</button></div>';
-      
-      b.querySelectorAll('.sw2 button').forEach(function(x){x.onclick=function(){mode=x.dataset.m;renderProfile()}});
-      $('go').onclick = submit;
-      b.querySelectorAll('input').forEach(function(i){i.onkeydown=function(e){if(e.key==='Enter')submit()}});
+      '<div class="err" id="err"></div>'+
+      '<button class="btn fill" id="go">'+(mode==='in'?'Войти':'Создать аккаунт')+'</button></div>';
 
-      if (mode === 'up' && $('sendCode')) {
-        $('sendCode').onclick = async function() {
-          var email = $('a-email').value.trim();
-          if (!email) { $('err').textContent = 'Введите email'; return; }
-          $('sendCode').disabled = true;
-          $('sendCode').textContent = 'Отправка…';
-          $('err').textContent = '';
-          try {
-            var r = await fetch('/api/auth/send-code', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: email })
-            });
-            var d = await r.json();
-            if (!r.ok) throw new Error(d.error);
-            $('sendCode').textContent = '✓ Код отправлен';
-            $('sendCode').style.color = '#7dffb0';
-            setTimeout(function(){
-              $('sendCode').textContent = 'Отправить код ещё раз';
-              $('sendCode').style.color = '';
-              $('sendCode').disabled = false;
-            }, 60000);
-          } catch(e) {
-            $('err').textContent = e.message || 'Ошибка';
-            $('sendCode').textContent = 'Отправить код на почту';
-            $('sendCode').disabled = false;
-          }
-        };
+      b.querySelectorAll('.sw2 button').forEach(function(x){
+        x.onclick=function(){ mode=x.dataset.m; regStep='form'; renderProfile(); };
+      });
+      $('go').onclick = submit;
+      b.querySelectorAll('input').forEach(function(i){
+        i.onkeydown=function(e){ if(e.key==='Enter') submit(); };
+      });
+
+      // Восстановим введённые данные при возврате назад
+      if (pendingReg && mode === 'up') {
+        $('a-nick').value = pendingReg.nick || '';
+        $('a-email').value = pendingReg.email || '';
+        $('a-pw').value = pendingReg.password || '';
       }
       return;
     }
+
+    // --- Авторизован ---
     var T=[['me','Профиль'],['sub','Подписка'],['dl','Лаунчер']],h;
     if (ptab === 'sub') {
-      h='<h2>Подписка</h2><p class="sub">Сейчас: <span class="pill">'+esc(me.plan||'Free')+'</span></p>'+
-      '<p class="hint">Оплата пока не подключена.</p>';
+      h='<h2>Подписка</h2><p class="sub">Сейчас: <span class="pill">'+esc(me.plan||'Free')+'</span></p><p class="hint">Оплата пока не подключена.</p>';
     } else if (ptab === 'dl') {
       h='<h2>Лаунчер</h2><p class="sub">Скачай лаунчер и войди под своим аккаунтом.</p>'+
       '<ol class="steps"><li>Скачай и установи лаунчер.</li><li>Войди под ником <b>'+esc(me.nick)+'</b>.</li><li>Выбери версию и нажми «Играть».</li></ol>';
@@ -371,6 +352,9 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
       };
     }
   }
+
+  // Вкладка Профиль (у авторизованного) — переменная для текущей вкладки
+  var ptab='me';
 
   function loadSkin(f) {
     if (!f) return;
@@ -406,25 +390,82 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     } catch(e) { alert(e.message); }
   }
 
+  // --- Основная кнопка: Вход / Регистрация ---
   async function submit() {
     var nick = $('a-nick').value.trim();
     var pw = $('a-pw').value;
     var err = $('err');
     err.textContent = '';
+
+    // --- ВХОД ---
+    if (mode === 'in') {
+      try {
+        var data = await api('/api/auth/login', { method: 'POST', body: { nick: nick, password: pw } });
+        token = data.token;
+        localStorage.setItem('tdlc_token', token);
+        me = data.user;
+        if (me && me.skin) await extractFace(me.skin);
+        renderProfile();
+      } catch (e) { err.textContent = e.message || 'Ошибка'; }
+      return;
+    }
+
+    // --- РЕГИСТРАЦИЯ: шаг 1 — отправка кода ---
+    var email = $('a-email').value.trim();
+    if (!nick) { err.textContent = 'Введите ник'; return; }
+    if (!/^[A-Za-z0-9_]{3,16}$/.test(nick)) { err.textContent = 'Ник: 3–16 символов, латиница, цифры и _'; return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Введите корректный email'; return; }
+    if (pw.length < 6) { err.textContent = 'Пароль минимум 6 символов'; return; }
+
+    var btn = $('go');
+    btn.disabled = true;
+    btn.textContent = 'Отправляем код…';
+
     try {
-      var body = { nick: nick, password: pw };
-      if (mode === 'up') {
-        body.email = $('a-email').value.trim();
-        body.code = $('a-code').value.trim();
-      }
-      var path = mode === 'up' ? '/api/auth/register' : '/api/auth/login';
-      var data = await api(path, { method: 'POST', body: body });
+      await api('/api/auth/send-code', { method: 'POST', body: { email: email } });
+      pendingReg = { nick: nick, email: email, password: pw };
+      regStep = 'code';
+      renderProfile();
+    } catch (e) {
+      err.textContent = e.message || 'Не удалось отправить код';
+      btn.disabled = false;
+      btn.textContent = 'Создать аккаунт';
+    }
+  }
+
+  // --- Подтверждение кода ---
+  async function confirmCode() {
+    var code = $('a-code').value.trim();
+    var err = $('err');
+    err.textContent = '';
+    if (!code || code.length !== 6) { err.textContent = 'Введите 6-значный код'; return; }
+
+    var btn = $('go');
+    btn.disabled = true;
+    btn.textContent = 'Проверяем…';
+
+    try {
+      var data = await api('/api/auth/register', {
+        method: 'POST',
+        body: {
+          nick: pendingReg.nick,
+          password: pendingReg.password,
+          email: pendingReg.email,
+          code: code,
+        },
+      });
       token = data.token;
       localStorage.setItem('tdlc_token', token);
       me = data.user;
+      pendingReg = null;
+      regStep = 'form';
       if (me && me.skin) await extractFace(me.skin);
       renderProfile();
-    } catch (e) { err.textContent = e.message || 'Ошибка'; }
+    } catch (e) {
+      err.textContent = e.message || 'Неверный код';
+      btn.disabled = false;
+      btn.textContent = 'Подтвердить';
+    }
   }
 
   async function logout() {
@@ -432,6 +473,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     token = null; me = null;
     localStorage.removeItem('tdlc_token');
     ptab = 'me';
+    mode = 'in';
     renderProfile();
   }
 
