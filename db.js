@@ -1,49 +1,52 @@
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
+const { Pool } = require("pg");
 
-const DB_FILE = path.join(__dirname, "data.json");
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
-let db = {
-  users: {},          // { nick: { nick, salt, hash, uid, bio, plan, skin, created } }
-  sessions: {},       // { token: { nick, created } }
-  launcherCodes: {},  // { code: { nick, token, expiresAt } }
-};
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      nick TEXT PRIMARY KEY,
+      email TEXT UNIQUE,
+      email_verified BOOLEAN DEFAULT FALSE,
+      salt TEXT,
+      hash TEXT,
+      uid TEXT,
+      bio TEXT DEFAULT '',
+      plan TEXT DEFAULT 'Free',
+      skin TEXT,
+      created BIGINT
+    );
+  `);
 
-// Загружаем, если есть
-try {
-  if (fs.existsSync(DB_FILE)) {
-    db = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-  }
-} catch (e) {
-  console.error("DB load failed, starting fresh:", e);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      nick TEXT,
+      created BIGINT
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS launcher_codes (
+      code TEXT PRIMARY KEY,
+      nick TEXT,
+      token TEXT,
+      expires_at BIGINT
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS email_codes (
+      email TEXT PRIMARY KEY,
+      code TEXT,
+      expires_at BIGINT
+    );
+  `);
+
+  console.log("Database initialized");
 }
 
-function save() {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-}
-
-function hashPassword(salt, password) {
-  return crypto.scryptSync(password, salt, 64).toString("hex");
-}
-
-function makeToken() {
-  return crypto.randomBytes(32).toString("hex");
-}
-
-function makeCode() {
-  return crypto.randomBytes(16).toString("hex");
-}
-
-function makeUid() {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
-
-module.exports = {
-  db,
-  save,
-  hashPassword,
-  makeToken,
-  makeCode,
-  makeUid,
-};
+module.exports = { pool, initDb };

@@ -31,6 +31,7 @@ nav{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-cont
 .btn:active{transform:scale(.97)}
 .btn.fill{background:linear-gradient(135deg,var(--v1),var(--v2));border-color:transparent}
 .btn.ghost{border-color:var(--line);color:var(--mute)}
+.btn:disabled{opacity:.6;cursor:default}
 .view{display:none}.view.on{display:block;animation:in .5s ease both}
 @keyframes in{from{opacity:0;transform:translateY(10px)}}
 
@@ -59,7 +60,7 @@ h2{font:500 clamp(32px,5vw,44px)/1.1 var(--serif);margin:0 0 6px;letter-spacing:
 .sw2 button{border:0;background:transparent;padding:9px;border-radius:99px;cursor:pointer;color:var(--mute);transition:all .25s}
 .sw2 button.on{background:rgba(124,58,237,.4);color:#fff}
 label{display:block;font-size:13px;color:var(--mute);margin:14px 0 6px}
-input[type=text],input[type=password]{width:100%;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(8,5,26,.6);transition:border-color .25s,box-shadow .25s}
+input[type=text],input[type=password],input[type=email]{width:100%;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(8,5,26,.6);transition:border-color .25s,box-shadow .25s}
 input:focus{outline:0;border-color:var(--v2);box-shadow:0 0 0 3px rgba(164,92,240,.2)}
 .err{min-height:22px;margin:12px 0 4px;font-size:13px;color:#ff9db8}
 .auth .btn{width:100%}
@@ -76,7 +77,7 @@ input:focus{outline:0;border-color:var(--v2);box-shadow:0 0 0 3px rgba(164,92,24
 .stat b{font:700 24px var(--serif);color:var(--v3)}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .hint{font-size:13px;color:var(--mute);margin:10px 0 0}
-#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);opacity:0;background:var(--v1);padding:10px 20px;border-radius:99px;font-size:14px;transition:all .3s;pointer-events:none}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);opacity:0;background:var(--v1);padding:10px 20px;border-radius:99px;font-size:14px;transition:all .3s;pointer-events:none;z-index:100}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 
 .sec{max-width:1040px;margin:0 auto;padding:30px clamp(16px,5vw,40px) 90px}
@@ -116,20 +117,8 @@ textarea:focus{outline:0;border-color:var(--v2);box-shadow:0 0 0 3px rgba(164,92
 
 html{scroll-behavior:smooth;scroll-padding-top:82px}
 .section-kicker{display:block;color:#bd91ff;font-size:10px;font-weight:700;letter-spacing:.2em;margin-bottom:12px}
-.sec{max-width:1160px;padding-top:78px}
-.sec h2,.feature-band h2,.video-copy h2{font-size:clamp(36px,5vw,54px);margin-bottom:10px}
+.sec h2{font-size:clamp(36px,5vw,54px);margin-bottom:10px}
 .sec>.sub{max-width:620px;margin-bottom:32px}
-.feature-band{max-width:1080px;margin:10px auto 90px;padding:clamp(24px,5vw,52px);display:grid;grid-template-columns:1fr .9fr;gap:44px;border:1px solid var(--line);border-radius:28px;background:linear-gradient(130deg,rgba(74,39,135,.28),rgba(13,8,31,.78));box-shadow:0 24px 80px rgba(0,0,0,.14)}
-.feature-band p,.video-copy p{max-width:440px;color:var(--mute);line-height:1.8}
-.feature-points{display:flex;flex-direction:column;justify-content:center}
-.feature-points>div{display:flex;gap:18px;padding:17px 0;border-bottom:1px solid rgba(164,92,240,.16)}
-.feature-points>div:last-child{border-bottom:0}
-.feature-points>div>b{font:500 23px var(--serif);color:#a978ee}
-.feature-points strong,.feature-points small{display:block}
-.feature-points strong{font-size:14px}
-.feature-points small{margin-top:4px;color:var(--mute);font-size:12px}
-.video-section{max-width:1080px;margin:0 auto;padding:20px 24px 90px;display:grid;grid-template-columns:.8fr 1.2fr;align-items:center;gap:50px}
-.video-copy p{max-width:440px;color:var(--mute);line-height:1.8}
 .end{padding:48px 20px 78px;background:radial-gradient(ellipse at center top,rgba(93,50,157,.15),transparent 65%)}
 .end p{max-width:460px;margin:0 auto 22px;color:var(--mute)}
 .site-footer{max-width:1160px;margin:0 auto;padding:24px clamp(18px,5vw,40px) 30px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid rgba(164,92,240,.16);color:var(--mute);font-size:11px}
@@ -177,9 +166,8 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 .profile-bottom-row strong{font-size:12px}
 .profile-bottom-row small{font-size:10px;color:var(--mute);margin-top:4px}
 .profile-bottom-row .btn{font-size:11px;padding:9px 14px}
-@media(max-width:900px){.feature-band{margin-left:20px;margin-right:20px}.video-section{gap:28px}.profile-overview{align-items:flex-start;flex-direction:column}}
-@media(max-width:760px){.feature-band,.video-section{grid-template-columns:1fr}.pl{grid-template-columns:1fr}.side{flex-direction:row;overflow-x:auto;position:static}.side:before{display:none}.side button{white-space:nowrap}.profile-edit-grid{grid-template-columns:1fr}}
-@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.video-card,.face,.fr{transition:none!important}}
+@media(max-width:900px){.profile-overview{align-items:flex-start;flex-direction:column}}
+@media(max-width:760px){.pl{grid-template-columns:1fr}.side{flex-direction:row;overflow-x:auto;position:static}.side:before{display:none}.side button{white-space:nowrap}.profile-edit-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -230,7 +218,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 
-  // Дефолтное лицо 8×8 на canvas, увеличенное до 64×64
+  // Дефолтное лицо 8×8, увеличенное до 64×64
   var MAP=['HHHHHHHH','HHHHHHHH','HSSSSSSH','SWESSEWS','SSSSSSSS','SSMMMMSS','SSSSSSSS','SSSSSSSS'],
       COL={H:'#2a1458',S:'#e8b79a',W:'#ffffff',E:'#7c3aed',M:'#b5735a'},defFace;
   (function(){
@@ -247,12 +235,8 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     defFace = c.toDataURL();
   })();
 
-  // Кэш обрезанных лиц: { dataUrlПолногоСкина: dataUrlЛица }
   var faceCache = {};
 
-  /**
-   * Вырезает лицо 8×8 из скина 64×64, увеличивает до 64×64.
-   */
   function extractFace(dataUrl) {
     return new Promise(function(resolve){
       if (!dataUrl) return resolve(defFace);
@@ -267,9 +251,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
           c.width = c.height = 64;
           var x = c.getContext('2d');
           x.imageSmoothingEnabled = false;
-          // Лицо 8×8 из позиции (8,8) в 64×64
           x.drawImage(img, 8, 8, 8, 8, 0, 0, 64, 64);
-          // Верхний слой шляпы из (40,8) — только для 64×64
           if (img.height === 64) {
             x.drawImage(img, 40, 8, 8, 8, 0, 0, 64, 64);
           }
@@ -284,7 +266,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     });
   }
 
-  // Синхронно возвращает кэшированное лицо
   function face(u) {
     if (!u || !u.skin) return defFace;
     return faceCache[u.skin] || defFace;
@@ -319,12 +300,45 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
       b.innerHTML='<div class="auth card"><h2>Аккаунт</h2><p class="sub">Войди или создай профиль.</p>'+
       '<div class="sw2"><button data-m="in" class="'+(mode==='in'?'on':'')+'">Вход</button><button data-m="up" class="'+(mode==='up'?'on':'')+'">Регистрация</button></div>'+
       '<label for="a-nick">Ник</label><input type="text" id="a-nick" maxlength="16" autocomplete="username" spellcheck="false">'+
+      (mode==='up'?'<label for="a-email">Email</label><input type="email" id="a-email" placeholder="you@example.com">'+
+        '<button type="button" class="btn" id="sendCode" style="margin-top:10px;width:100%">Отправить код на почту</button>'+
+        '<label for="a-code">Код из письма</label><input type="text" id="a-code" placeholder="6 цифр" maxlength="6" inputmode="numeric">':'')+
       '<label for="a-pw">Пароль</label><input type="password" id="a-pw" autocomplete="'+(mode==='in'?'current-password':'new-password')+'">'+
-      (mode==='up'?'<label for="a-pw2">Повтори пароль</label><input type="password" id="a-pw2" autocomplete="new-password">':'')+
       '<div class="err" id="err"></div><button class="btn fill" id="go">'+(mode==='in'?'Войти':'Создать аккаунт')+'</button></div>';
+      
       b.querySelectorAll('.sw2 button').forEach(function(x){x.onclick=function(){mode=x.dataset.m;renderProfile()}});
       $('go').onclick = submit;
       b.querySelectorAll('input').forEach(function(i){i.onkeydown=function(e){if(e.key==='Enter')submit()}});
+
+      if (mode === 'up' && $('sendCode')) {
+        $('sendCode').onclick = async function() {
+          var email = $('a-email').value.trim();
+          if (!email) { $('err').textContent = 'Введите email'; return; }
+          $('sendCode').disabled = true;
+          $('sendCode').textContent = 'Отправка…';
+          $('err').textContent = '';
+          try {
+            var r = await fetch('/api/auth/send-code', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: email })
+            });
+            var d = await r.json();
+            if (!r.ok) throw new Error(d.error);
+            $('sendCode').textContent = '✓ Код отправлен';
+            $('sendCode').style.color = '#7dffb0';
+            setTimeout(function(){
+              $('sendCode').textContent = 'Отправить код ещё раз';
+              $('sendCode').style.color = '';
+              $('sendCode').disabled = false;
+            }, 60000);
+          } catch(e) {
+            $('err').textContent = e.message || 'Ошибка';
+            $('sendCode').textContent = 'Отправить код на почту';
+            $('sendCode').disabled = false;
+          }
+        };
+      }
       return;
     }
     var T=[['me','Профиль'],['sub','Подписка'],['dl','Лаунчер']],h;
@@ -358,7 +372,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     }
   }
 
-  // Загрузка нового скина — сохраняем ПОЛНЫЙ PNG
   function loadSkin(f) {
     if (!f) return;
     var r = new FileReader();
@@ -369,7 +382,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
           alert('Нужен скин 64×64 или 64×32');
           return;
         }
-        // Проверка размера файла — не больше ~40 KB
         if (r.result.length > 120000) {
           alert('Файл слишком большой');
           return;
@@ -400,14 +412,19 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     var err = $('err');
     err.textContent = '';
     try {
+      var body = { nick: nick, password: pw };
+      if (mode === 'up') {
+        body.email = $('a-email').value.trim();
+        body.code = $('a-code').value.trim();
+      }
       var path = mode === 'up' ? '/api/auth/register' : '/api/auth/login';
-      var data = await api(path, { method: 'POST', body: { nick: nick, password: pw } });
+      var data = await api(path, { method: 'POST', body: body });
       token = data.token;
       localStorage.setItem('tdlc_token', token);
       me = data.user;
       if (me && me.skin) await extractFace(me.skin);
       renderProfile();
-    } catch (e) { err.textContent = e.message; }
+    } catch (e) { err.textContent = e.message || 'Ошибка'; }
   }
 
   async function logout() {
