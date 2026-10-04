@@ -274,7 +274,6 @@ app.get("/api/yggdrasil", (req, res) => {
       implementationVersion: "1.0.0",
     },
     skinDomains: [new URL(BASE_URL).hostname],
-    signaturePublickey: "",
   });
 });
 
