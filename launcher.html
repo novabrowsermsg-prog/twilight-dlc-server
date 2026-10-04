@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход в twilightDLC</title>
+<style>
+  body{margin:0;background:#08051a;color:#f1eaff;font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh}
+  .card{background:linear-gradient(160deg,rgba(124,58,237,.2),rgba(20,12,43,.9));border:1px solid rgba(164,92,240,.3);border-radius:20px;padding:32px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  h1{margin:0 0 6px;font-size:24px}
+  p{color:#9a8cc4;line-height:1.6;margin:0 0 20px}
+  .row{display:flex;gap:10px;margin-top:18px}
+  button{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(164,92,240,.3);background:transparent;color:#f1eaff;font-size:14px;cursor:pointer;transition:.2s}
+  button.primary{background:linear-gradient(135deg,#7c3aed,#a45cf0);border-color:transparent;font-weight:600}
+  button:hover{filter:brightness(1.1)}
+  .err{color:#ff9db8;font-size:13px;min-height:18px;margin-top:10px}
+  input{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(164,92,240,.3);background:rgba(8,5,26,.6);color:#f1eaff;margin-bottom:10px}
+  .hide{display:none}
+  .ok{color:#a7f5c4}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>twilightDLC</h1>
+  <p id="sub">Приложение запрашивает доступ к вашему аккаунту.</p>
+
+  <div id="form">
+    <input id="nick" placeholder="Ник" autocomplete="username">
+    <input id="pw" type="password" placeholder="Пароль" autocomplete="current-password">
+    <div class="err" id="err"></div>
+    <div class="row">
+      <button id="loginBtn" class="primary">Войти</button>
+      <button id="regBtn">Регистрация</button>
+    </div>
+  </div>
+
+  <div id="approve" class="hide">
+    <div class="row">
+      <button id="allowBtn" class="primary">Разрешить вход</button>
+      <button id="cancelBtn">Отмена</button>
+    </div>
+  </div>
+
+  <div id="done" class="hide">
+    <p class="ok">✔ Готово! Вернитесь в лаунчер.</p>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const code = params.get("code");
+const $ = (id) => document.getElementById(id);
+
+function setError(msg) { $("err").textContent = msg || ""; }
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    method: opts.method || "GET",
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`);
+  return data;
+}
+
+function getToken() { return localStorage.getItem("tdlc_token"); }
+
+async function checkSession() {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    await api("/api/auth/me", { headers: { Authorization: "Bearer " + token } });
+    return true;
+  } catch { return false; }
+}
+
+async function login(register) {
+  const nick = $("nick").value.trim();
+  const pw = $("pw").value;
+  setError("");
+  try {
+    const data = await api(register ? "/api/auth/register" : "/api/auth/login", {
+      method: "POST",
+      body: { nick, password: pw },
+    });
+    localStorage.setItem("tdlc_token", data.token);
+    showApprove();
+  } catch (e) { setError(e.message); }
+}
+
+function showApprove() {
+  $("form").classList.add("hide");
+  $("approve").classList.remove("hide");
+  $("sub").textContent = "Подтвердите вход в лаунчер twilightDLC";
+}
+
+async function approve() {
+  const token = getToken();
+  try {
+    await api("/api/launcher/approve", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token },
+      body: { code },
+    });
+    $("approve").classList.add("hide");
+    $("done").classList.remove("hide");
+    $("sub").textContent = "Можно закрыть вкладку";
+  } catch (e) { setError(e.message); }
+}
+
+$("loginBtn").onclick = () => login(false);
+$("regBtn").onclick = () => login(true);
+$("allowBtn").onclick = approve;
+$("cancelBtn").onclick = () => { $("approve").classList.add("hide"); $("form").classList.remove("hide"); };
+
+// При загрузке: если уже авторизован — сразу показать «Разрешить»
+(async () => {
+  if (!code) { $("sub").textContent = "Ошибка: code отсутствует"; return; }
+  if (await checkSession()) showApprove();
+})();
+</script>
+</body>
+</html>
