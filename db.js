@@ -1,6 +1,5 @@
 const { Pool } = require("pg");
 
-// Убираем sslmode из URL, чтобы pg не применял свою логику SSL
 const connectionString = (process.env.DATABASE_URL || "").replace(
   /[?&]sslmode=[^&]*/g,
   ""
@@ -8,9 +7,7 @@ const connectionString = (process.env.DATABASE_URL || "").replace(
 
 const pool = new Pool({
   connectionString,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: { rejectUnauthorized: false },
 });
 
 async function initDb() {

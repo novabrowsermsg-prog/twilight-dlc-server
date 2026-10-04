@@ -3,7 +3,6 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const { pool, initDb } = require("./db");
 
 const app = express();
@@ -14,14 +13,10 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const BASE_URL =
   process.env.BASE_URL || "https://twilight-dlc-server.onrender.com";
 
-// ---------- Email transporter (Gmail) ----------
-const mailer = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
-  },
-});
+// ---------- Brevo (email через HTTP API) ----------
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL;
+const BREVO_SENDER_NAME = "twilightDLC";
 
 // ---------- Middleware ----------
 app.use(express.json({ limit: "5mb" }));
@@ -64,7 +59,40 @@ function uuidNoDashes(name) {
   return offlinePlayerId(name).replace(/-/g, "");
 }
 
-// ---------- Profile ----------
+// ---------- Send email via Brevo HTTP API ----------
+async function sendVerificationEmail(email, code) {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": BREVO_API_KEY,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
+      to: [{ email: email }],
+      subject: "Подтверждение почты twilightDLC",
+      htmlContent: `
+        <div style="font-family: sans-serif; background:#1a0f30; color:#f0e6ff; padding:30px; border-radius:12px; max-width:480px;">
+          <h2 style="color:#b86ee8; margin:0 0 12px; letter-spacing:1px;">twilightDLC</h2>
+          <p style="font-size:14px; color:#c0b0e6;">Ваш код подтверждения:</p>
+          <p style="font-size:34px; letter-spacing:10px; font-weight:bold; color:#fff; margin:16px 0;">${code}</p>
+          <p style="color:#9a8cc4; font-size:12px; line-height:1.6;">
+            Код действует 10 минут.<br>
+            Если вы не регистрировались — просто проигнорируйте это письмо.
+          </p>
+        </div>
+      `,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Brevo API error: ${res.status} ${err}`);
+  }
+}
+
+// ---------- Profile сборки ----------
 app.get("/minecraft/api/v1/profile", (req, res) => {
   fs.readFile(path.join(__dirname, "profile.json"), "utf8", (err, data) => {
     if (err) return res.status(404).json({ error: "Profile not found" });
@@ -72,7 +100,7 @@ app.get("/minecraft/api/v1/profile", (req, res) => {
   });
 });
 
-// ---------- Manifest ----------
+// ---------- Манифест модов ----------
 function sha1File(filePath) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash("sha1");
@@ -145,53 +173,38 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-// ---------- Send email ----------
-async function sendVerificationEmail(email, code) {
-  await mailer.sendMail({
-    from: `"twilightDLC" <${process.env.GMAIL_USER}>`,
-    to: email,
-    subject: "Подтверждение почты twilightDLC",
-    html: `
-      <div style="font-family: sans-serif; background:#1a0f30; color:#f0e6ff; padding:30px; border-radius:12px; max-width:480px;">
-        <h2 style="color:#b86ee8; margin:0 0 12px; letter-spacing:1px;">twilightDLC</h2>
-        <p style="font-size:14px; color:#c0b0e6;">Ваш код подтверждения:</p>
-        <p style="font-size:34px; letter-spacing:10px; font-weight:bold; color:#fff; margin:16px 0;">${code}</p>
-        <p style="color:#9a8cc4; font-size:12px; line-height:1.6;">
-          Код действует 10 минут.<br>
-          Если вы не регистрировались — просто проигнорируйте это письмо.
-        </p>
-      </div>
-    `,
-  });
-}
-
-// ---------- Register (шаг 1: отправка кода) ----------
+// ---------- Send code (регистрация шаг 1) ----------
 app.post("/api/auth/send-code", async (req, res) => {
-  const { email } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return res.status(400).json({ error: "Введите корректный email" });
-
-  const code = makeCode();
-  const expiresAt = Date.now() + 10 * 60 * 1000;
-
-  await pool.query(
-    `INSERT INTO email_codes (email, code, expires_at) VALUES ($1, $2, $3)
-     ON CONFLICT (email) DO UPDATE SET code = $2, expires_at = $3`,
-    [email.toLowerCase(), code, expiresAt]
-  );
-
   try {
-    await sendVerificationEmail(email, code);
-    console.log("Verification code sent to", email);
-  } catch (e) {
-    console.error("Email send failed:", e);
-    return res.status(500).json({ error: "Не удалось отправить письмо" });
-  }
+    const { email } = req.body || {};
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return res.status(400).json({ error: "Введите корректный email" });
 
-  res.json({ ok: true });
+    const code = makeCode();
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+
+    await pool.query(
+      `INSERT INTO email_codes (email, code, expires_at) VALUES ($1, $2, $3)
+       ON CONFLICT (email) DO UPDATE SET code = $2, expires_at = $3`,
+      [email.toLowerCase(), code, expiresAt]
+    );
+
+    // Отвечаем СРАЗУ — не ждём Brevo
+    res.json({ ok: true });
+
+    // Письмо отправляем в фоне
+    sendVerificationEmail(email, code)
+      .then(() => console.log("Verification code sent to", email))
+      .catch((e) => console.error("Background email failed:", e));
+  } catch (e) {
+    console.error("send-code error:", e);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Ошибка сервера" });
+    }
+  }
 });
 
-// ---------- Register (шаг 2: проверка + создание) ----------
+// ---------- Register (шаг 2) ----------
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { nick, password, email, code } = req.body || {};
@@ -448,6 +461,7 @@ initDb()
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`BASE_URL: ${BASE_URL}`);
+      console.log(`Brevo sender: ${BREVO_SENDER_EMAIL}`);
     });
   })
   .catch((e) => {
