@@ -92,11 +92,24 @@ async function sendVerificationEmail(email, code) {
   }
 }
 
-// ---------- Profile сборки ----------
+// ---------- Профиль сборки ----------
 app.get("/minecraft/api/v1/profile", (req, res) => {
   fs.readFile(path.join(__dirname, "profile.json"), "utf8", (err, data) => {
     if (err) return res.status(404).json({ error: "Profile not found" });
     res.json(JSON.parse(data));
+  });
+});
+
+// ---------- Новости ----------
+app.get("/api/news", (req, res) => {
+  const file = path.join(PUBLIC_DIR, "news.json");
+  fs.readFile(file, "utf8", (err, data) => {
+    if (err) return res.json([]);
+    try {
+      res.json(JSON.parse(data));
+    } catch {
+      res.json([]);
+    }
   });
 });
 
@@ -189,10 +202,8 @@ app.post("/api/auth/send-code", async (req, res) => {
       [email.toLowerCase(), code, expiresAt]
     );
 
-    // Отвечаем СРАЗУ — не ждём Brevo
     res.json({ ok: true });
 
-    // Письмо отправляем в фоне
     sendVerificationEmail(email, code)
       .then(() => console.log("Verification code sent to", email))
       .catch((e) => console.error("Background email failed:", e));
