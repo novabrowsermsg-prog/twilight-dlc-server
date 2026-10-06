@@ -146,11 +146,19 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 .friends-add input:focus{outline:0;border-color:var(--v2);box-shadow:0 0 0 3px rgba(164,92,240,.2)}
 .friends-add .btn{white-space:nowrap}
 #f-err{min-height:20px;font-size:13px;color:#ff9db8;margin:2px 0 8px}
-.friends-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.friends-tabs{display:flex;gap:4px;border-bottom:1px solid rgba(164,92,240,.16);margin:6px 0 16px}
+.friends-tab{padding:8px 16px;border:0;background:transparent;color:var(--mute);cursor:pointer;font-size:13px;border-radius:6px 6px 0 0;position:relative;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.friends-tab:hover{color:var(--ink)}
+.friends-tab.on{color:var(--ink);background:rgba(124,58,237,.14);box-shadow:inset 0 -2px 0 var(--v2)}
+.friends-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;padding:0 5px;border-radius:99px;font-size:10px;font-weight:700;background:rgba(124,58,237,.25);color:var(--mute)}
+.friends-tab-badge.is-accent{background:rgba(216,150,245,.45);color:#fff;box-shadow:0 0 8px rgba(216,150,245,.4)}
+.friends-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .friend-card{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(10,7,27,.5);transition:all .2s}
 .friend-card.is-online{border-color:rgba(125,255,176,.35);box-shadow:0 0 24px rgba(125,255,176,.08)}
+.friend-card.is-request{border-color:rgba(164,92,240,.3);background:rgba(124,58,237,.08)}
 .friend-card:hover{border-color:rgba(164,92,240,.4);transform:translateY(-1px)}
-.friend-avatar{position:relative;width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff;background:linear-gradient(135deg,var(--v1),var(--v2));flex-shrink:0}
+.friend-avatar{position:relative;width:44px;height:44px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff;background:linear-gradient(135deg,var(--v1),var(--v2));flex-shrink:0}
+.friend-avatar img{width:100%;height:100%;border-radius:11px;image-rendering:pixelated;object-fit:cover}
 .friend-dot{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;border:2px solid var(--bg)}
 .friend-dot.online{background:#4ade80;box-shadow:0 0 10px rgba(74,222,128,.7)}
 .friend-dot.offline{background:#5a4b70}
@@ -158,11 +166,16 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 .friend-nick{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .friend-status{font-size:11px;color:var(--mute);margin-top:2px}
 .friend-card.is-online .friend-status{color:#7dffb0}
+.friend-bio{font-size:11px;color:var(--mute);margin-top:4px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.friend-actions{display:flex;gap:6px;flex-shrink:0}
 .friend-card .btn{padding:7px 14px;font-size:12px;flex-shrink:0}
-
+.friend-card .btn.danger{border-color:rgba(255,157,184,.35);color:#ff9db8}
+.friend-card .btn.danger:hover{background:rgba(224,69,122,.15);border-color:#e0457a;color:#fff}
+.friend-card .btn.accent{background:linear-gradient(135deg,var(--v1),var(--v2));border-color:transparent;color:#fff}
+.friend-card .btn.accent:hover{box-shadow:0 4px 18px rgba(164,92,240,.5)}
 @media(max-width:900px){.profile-overview{align-items:flex-start;flex-direction:column}}
 @media(max-width:760px){.pl{grid-template-columns:1fr}.side{flex-direction:row;overflow-x:auto;position:static}.side:before{display:none}.side button{white-space:nowrap}.profile-edit-grid{grid-template-columns:1fr}}
-@media(max-width:560px){.friends-add{flex-direction:column}.friends-add .btn{width:100%}}
+@media(max-width:560px){.friends-add{flex-direction:column}.friends-add .btn{width:100%}.friend-card{flex-wrap:wrap}.friend-actions{width:100%}.friend-actions .btn{flex:1}}
 </style>
 </head>
 <body>
@@ -238,7 +251,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
       if (faceCache[dataUrl]) return resolve(faceCache[dataUrl]);
 
       var img = new Image();
-      img.crossOrigin = 'anonymous';
+      if (!dataUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
       img.onload = function(){
         try {
           var c = document.createElement('canvas');
@@ -288,6 +301,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
   var mode='in', regStep='form';
   var pendingReg = null;
   var ptab='me';
+  var ftab='friends';
 
   // ===== FRIENDS =====
   var friendsRefreshTimer = null;
@@ -303,36 +317,116 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     var statusText = f.online ? 'В сети' : 'Не в сети';
     var dotClass = f.online ? 'online' : 'offline';
     return '<div class="friend-card'+(f.online?' is-online':'')+'">'+
-      '<div class="friend-avatar">'+esc((f.nick||'?').slice(0,1).toUpperCase())+
+      '<div class="friend-avatar"><img src="'+face(f)+'" alt="">'+
         '<span class="friend-dot '+dotClass+'"></span></div>'+
       '<div class="friend-body">'+
         '<div class="friend-nick">'+esc(f.nick)+'</div>'+
         '<div class="friend-status">'+esc(statusText)+'</div>'+
+        (f.bio ? '<div class="friend-bio">'+esc(f.bio)+'</div>' : '')+
       '</div>'+
-      '<button class="btn ghost f-remove" data-nick="'+esc(f.nick)+'">Удалить</button>'+
+      '<button class="btn danger f-remove" data-nick="'+esc(f.nick)+'">Удалить</button>'+
     '</div>';
   }
 
-  async function loadFriends() {
-    var listEl = $('f-list');
-    if (!listEl) return;
+  function renderIncomingCard(r) {
+    return '<div class="friend-card is-request">'+
+      '<div class="friend-avatar"><img src="'+face(r)+'" alt=""></div>'+
+      '<div class="friend-body">'+
+        '<div class="friend-nick">'+esc(r.nick)+'</div>'+
+        '<div class="friend-status">Хочет добавить вас в друзья</div>'+
+        (r.bio ? '<div class="friend-bio">'+esc(r.bio)+'</div>' : '')+
+      '</div>'+
+      '<div class="friend-actions">'+
+        '<button class="btn accent f-accept" data-nick="'+esc(r.nick)+'">Принять</button>'+
+        '<button class="btn danger f-decline" data-nick="'+esc(r.nick)+'">Отклонить</button>'+
+      '</div>'+
+    '</div>';
+  }
+
+  function renderOutgoingCard(r) {
+    return '<div class="friend-card is-request">'+
+      '<div class="friend-avatar"><img src="'+face(r)+'" alt=""></div>'+
+      '<div class="friend-body">'+
+        '<div class="friend-nick">'+esc(r.nick)+'</div>'+
+        '<div class="friend-status">Ожидает подтверждения</div>'+
+        (r.bio ? '<div class="friend-bio">'+esc(r.bio)+'</div>' : '')+
+      '</div>'+
+      '<button class="btn danger f-cancel" data-nick="'+esc(r.nick)+'">Отменить</button>'+
+    '</div>';
+  }
+
+  async function loadFriendTab() {
+    if (ptab !== 'friends') return;
+    var container = $('f-tab-content');
+    var tabsEl = $('f-tabs');
+    if (!container || !tabsEl) return;
+
     try {
-      var list = await api('/api/friends');
-      if (!Array.isArray(list)) list = [];
+      var results = await Promise.all([
+        api('/api/friends'),
+        api('/api/friends/requests'),
+        api('/api/friends/requests/outgoing'),
+      ]);
+      var friends = Array.isArray(results[0]) ? results[0] : [];
+      var incoming = Array.isArray(results[1]) ? results[1] : [];
+      var outgoing = Array.isArray(results[2]) ? results[2] : [];
+
+      // прекэшируем лица
+      var all = friends.concat(incoming, outgoing);
+      await Promise.all(all.map(function(x){
+        if (x.skin && !faceCache[x.skin]) return extractFace(x.skin);
+        return Promise.resolve();
+      }));
+
+      // обновляем бейджи на табах
+      tabsEl.innerHTML =
+        '<button class="friends-tab'+(ftab==='friends'?' on':'')+'" data-ft="friends">Друзья'+
+          (friends.length?' <span class="friends-tab-badge">'+friends.length+'</span>':'')+
+        '</button>'+
+        '<button class="friends-tab'+(ftab==='incoming'?' on':'')+'" data-ft="incoming">Входящие'+
+          (incoming.length?' <span class="friends-tab-badge is-accent">'+incoming.length+'</span>':'')+
+        '</button>'+
+        '<button class="friends-tab'+(ftab==='outgoing'?' on':'')+'" data-ft="outgoing">Исходящие'+
+          (outgoing.length?' <span class="friends-tab-badge">'+outgoing.length+'</span>':'')+
+        '</button>';
+      tabsEl.querySelectorAll('.friends-tab').forEach(function(b){
+        b.onclick = function(){ ftab = b.dataset.ft; loadFriendTab(); };
+      });
+
+      var list = ftab === 'friends' ? friends : ftab === 'incoming' ? incoming : outgoing;
       if (list.length === 0) {
-        listEl.innerHTML = '<p class="hint">Пока нет друзей. Добавь первого!</p>';
+        var msg = ftab === 'friends' ? 'Пока нет друзей. Найди игрока по нику выше!' :
+                  ftab === 'incoming' ? 'Нет входящих запросов' :
+                  'Нет исходящих запросов';
+        container.innerHTML = '<p class="hint">'+msg+'</p>';
         return;
       }
-      listEl.innerHTML = '<div class="friends-list">'+list.map(renderFriendCard).join('')+'</div>';
-      listEl.querySelectorAll('.f-remove').forEach(function(btn){
-        btn.onclick = function(){ removeFriend(btn.dataset.nick); };
+
+      var html = list.map(function(x){
+        if (ftab === 'friends') return renderFriendCard(x);
+        if (ftab === 'incoming') return renderIncomingCard(x);
+        return renderOutgoingCard(x);
+      }).join('');
+      container.innerHTML = '<div class="friends-list">'+html+'</div>';
+
+      container.querySelectorAll('.f-remove').forEach(function(b){
+        b.onclick = function(){ removeFriend(b.dataset.nick); };
+      });
+      container.querySelectorAll('.f-accept').forEach(function(b){
+        b.onclick = function(){ acceptFriend(b.dataset.nick); };
+      });
+      container.querySelectorAll('.f-decline').forEach(function(b){
+        b.onclick = function(){ declineFriend(b.dataset.nick); };
+      });
+      container.querySelectorAll('.f-cancel').forEach(function(b){
+        b.onclick = function(){ cancelFriend(b.dataset.nick); };
       });
     } catch (e) {
-      listEl.innerHTML = '<p class="err">Не удалось загрузить друзей</p>';
+      container.innerHTML = '<p class="err">Не удалось загрузить</p>';
     }
   }
 
-  async function addFriend() {
+  async function sendFriendRequest() {
     var input = $('f-nick');
     var errEl = $('f-err');
     if (!input || !errEl) return;
@@ -343,40 +437,71 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
       errEl.textContent = 'Ник: 3–16 символов, латиница, цифры и _';
       return;
     }
-    var btn = $('f-add');
+    var btn = $('f-send');
     btn.disabled = true;
     btn.textContent = '…';
     try {
-      await api('/api/friends/add', { method: 'POST', body: { nick: nick } });
+      var res = await api('/api/friends/request', { method: 'POST', body: { nick: nick } });
       input.value = '';
-      await loadFriends();
+      if (res && res.accepted) {
+        showToast('Теперь вы друзья');
+        ftab = 'friends';
+      } else {
+        showToast('Запрос отправлен');
+        ftab = 'outgoing';
+      }
+      loadFriendTab();
     } catch (e) {
-      errEl.textContent = e.message || 'Не удалось добавить';
+      errEl.textContent = e.message || 'Не удалось отправить';
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Добавить';
+      btn.textContent = 'Отправить запрос';
     }
+  }
+
+  async function acceptFriend(nick) {
+    try {
+      await api('/api/friends/accept', { method: 'POST', body: { nick: nick } });
+      showToast('Теперь вы друзья');
+      loadFriendTab();
+    } catch (e) { showToast(e.message || 'Ошибка'); }
+  }
+
+  async function declineFriend(nick) {
+    try {
+      await api('/api/friends/decline', { method: 'POST', body: { nick: nick } });
+      showToast('Запрос отклонён');
+      loadFriendTab();
+    } catch (e) { showToast(e.message || 'Ошибка'); }
+  }
+
+  async function cancelFriend(nick) {
+    if (!confirm('Отменить запрос к «'+nick+'»?')) return;
+    try {
+      await api('/api/friends/request/'+encodeURIComponent(nick), { method: 'DELETE' });
+      showToast('Запрос отменён');
+      loadFriendTab();
+    } catch (e) { showToast(e.message || 'Ошибка'); }
   }
 
   async function removeFriend(nick) {
     if (!confirm('Удалить «'+nick+'» из друзей?')) return;
     try {
       await api('/api/friends/'+encodeURIComponent(nick), { method: 'DELETE' });
-      await loadFriends();
-    } catch (e) {
-      alert(e.message || 'Ошибка удаления');
-    }
+      showToast('Друг удалён');
+      loadFriendTab();
+    } catch (e) { showToast(e.message || 'Ошибка'); }
   }
 
   function setupFriendsTab() {
-    var addBtn = $('f-add');
+    var addBtn = $('f-send');
     var input = $('f-nick');
-    if (addBtn) addBtn.onclick = addFriend;
-    if (input) input.onkeydown = function(e){ if (e.key === 'Enter') addFriend(); };
+    if (addBtn) addBtn.onclick = sendFriendRequest;
+    if (input) input.onkeydown = function(e){ if (e.key === 'Enter') sendFriendRequest(); };
 
-    loadFriends();
+    loadFriendTab();
     stopFriendsRefresh();
-    friendsRefreshTimer = setInterval(loadFriends, 30000);
+    friendsRefreshTimer = setInterval(loadFriendTab, 30000);
   }
 
   // ===== HEARTBEAT =====
@@ -391,6 +516,13 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     };
     beat();
     setInterval(beat, 120000);
+  }
+
+  function showToast(msg){
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2200);
   }
 
   function renderProfile(){
@@ -447,13 +579,14 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     var T=[['me','Профиль'],['friends','Друзья'],['sub','Подписка'],['dl','Лаунчер']],h;
     if (ptab === 'friends') {
       h = '<h2>Друзья</h2>'+
-          '<p class="sub">Список друзей и их статус.</p>'+
+          '<p class="sub">Отправляй запросы, принимай входящие — и играй вместе.</p>'+
           '<div class="friends-add">'+
-            '<input type="text" id="f-nick" placeholder="Ник друга" maxlength="16" autocomplete="off" spellcheck="false">'+
-            '<button class="btn fill" id="f-add">Добавить</button>'+
+            '<input type="text" id="f-nick" placeholder="Ник игрока" maxlength="16" autocomplete="off" spellcheck="false">'+
+            '<button class="btn fill" id="f-send">Отправить запрос</button>'+
           '</div>'+
           '<div class="err" id="f-err"></div>'+
-          '<div id="f-list"><p class="hint">Загрузка…</p></div>';
+          '<div class="friends-tabs" id="f-tabs"></div>'+
+          '<div id="f-tab-content"><p class="hint">Загрузка…</p></div>';
     } else if (ptab === 'sub') {
       h='<h2>Подписка</h2><p class="sub">Сейчас: <span class="pill">'+esc(me.plan||'Free')+'</span></p><p class="hint">Оплата пока не подключена.</p>';
     } else if (ptab === 'dl') {
@@ -483,7 +616,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
       };
     }
 
-    if (ptab === 'friends' && $('f-list')) {
+    if (ptab === 'friends' && $('f-tab-content')) {
       setupFriendsTab();
     }
   }
@@ -602,8 +735,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     try { await api('/api/auth/logout', { method: 'POST' }); } catch(e){}
     token = null; me = null;
     localStorage.removeItem('tdlc_token');
-    ptab = 'me';
-    mode = 'in';
+    ptab = 'me'; ftab = 'friends'; mode = 'in';
     stopFriendsRefresh();
     renderProfile();
   }
