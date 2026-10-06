@@ -139,8 +139,30 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 .profile-bottom-row strong{font-size:12px}
 .profile-bottom-row small{font-size:10px;color:var(--mute);margin-top:4px}
 .profile-bottom-row .btn{font-size:11px;padding:9px 14px}
+
+/* ===== FRIENDS ===== */
+.friends-add{display:flex;gap:8px;margin:8px 0 6px}
+.friends-add input{flex:1;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(8,5,26,.6);transition:border-color .25s,box-shadow .25s}
+.friends-add input:focus{outline:0;border-color:var(--v2);box-shadow:0 0 0 3px rgba(164,92,240,.2)}
+.friends-add .btn{white-space:nowrap}
+#f-err{min-height:20px;font-size:13px;color:#ff9db8;margin:2px 0 8px}
+.friends-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.friend-card{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(10,7,27,.5);transition:all .2s}
+.friend-card.is-online{border-color:rgba(125,255,176,.35);box-shadow:0 0 24px rgba(125,255,176,.08)}
+.friend-card:hover{border-color:rgba(164,92,240,.4);transform:translateY(-1px)}
+.friend-avatar{position:relative;width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff;background:linear-gradient(135deg,var(--v1),var(--v2));flex-shrink:0}
+.friend-dot{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;border:2px solid var(--bg)}
+.friend-dot.online{background:#4ade80;box-shadow:0 0 10px rgba(74,222,128,.7)}
+.friend-dot.offline{background:#5a4b70}
+.friend-body{flex:1;min-width:0}
+.friend-nick{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.friend-status{font-size:11px;color:var(--mute);margin-top:2px}
+.friend-card.is-online .friend-status{color:#7dffb0}
+.friend-card .btn{padding:7px 14px;font-size:12px;flex-shrink:0}
+
 @media(max-width:900px){.profile-overview{align-items:flex-start;flex-direction:column}}
 @media(max-width:760px){.pl{grid-template-columns:1fr}.side{flex-direction:row;overflow-x:auto;position:static}.side:before{display:none}.side button{white-space:nowrap}.profile-edit-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.friends-add{flex-direction:column}.friends-add .btn{width:100%}}
 </style>
 </head>
 <body>
@@ -191,7 +213,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
 
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 
-  // Дефолтное лицо 8×8 (увеличено до 64×64)
   var MAP=['HHHHHHHH','HHHHHHHH','HSSSSSSH','SWESSEWS','SSSSSSSS','SSMMMMSS','SSSSSSSS','SSSSSSSS'],
       COL={H:'#2a1458',S:'#e8b79a',W:'#ffffff',E:'#7c3aed',M:'#b5735a'},defFace;
   (function(){
@@ -264,17 +285,120 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     }
   }
 
-  // mode: 'in' | 'up'  | regStep: 'form' | 'code'
   var mode='in', regStep='form';
-  var pendingReg = null; // { nick, email, password }
+  var pendingReg = null;
+  var ptab='me';
+
+  // ===== FRIENDS =====
+  var friendsRefreshTimer = null;
+
+  function stopFriendsRefresh() {
+    if (friendsRefreshTimer) {
+      clearInterval(friendsRefreshTimer);
+      friendsRefreshTimer = null;
+    }
+  }
+
+  function renderFriendCard(f) {
+    var statusText = f.online ? 'В сети' : 'Не в сети';
+    var dotClass = f.online ? 'online' : 'offline';
+    return '<div class="friend-card'+(f.online?' is-online':'')+'">'+
+      '<div class="friend-avatar">'+esc((f.nick||'?').slice(0,1).toUpperCase())+
+        '<span class="friend-dot '+dotClass+'"></span></div>'+
+      '<div class="friend-body">'+
+        '<div class="friend-nick">'+esc(f.nick)+'</div>'+
+        '<div class="friend-status">'+esc(statusText)+'</div>'+
+      '</div>'+
+      '<button class="btn ghost f-remove" data-nick="'+esc(f.nick)+'">Удалить</button>'+
+    '</div>';
+  }
+
+  async function loadFriends() {
+    var listEl = $('f-list');
+    if (!listEl) return;
+    try {
+      var list = await api('/api/friends');
+      if (!Array.isArray(list)) list = [];
+      if (list.length === 0) {
+        listEl.innerHTML = '<p class="hint">Пока нет друзей. Добавь первого!</p>';
+        return;
+      }
+      listEl.innerHTML = '<div class="friends-list">'+list.map(renderFriendCard).join('')+'</div>';
+      listEl.querySelectorAll('.f-remove').forEach(function(btn){
+        btn.onclick = function(){ removeFriend(btn.dataset.nick); };
+      });
+    } catch (e) {
+      listEl.innerHTML = '<p class="err">Не удалось загрузить друзей</p>';
+    }
+  }
+
+  async function addFriend() {
+    var input = $('f-nick');
+    var errEl = $('f-err');
+    if (!input || !errEl) return;
+    errEl.textContent = '';
+    var nick = input.value.trim().toLowerCase();
+    if (!nick) return;
+    if (!/^[a-z0-9_]{3,16}$/.test(nick)) {
+      errEl.textContent = 'Ник: 3–16 символов, латиница, цифры и _';
+      return;
+    }
+    var btn = $('f-add');
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      await api('/api/friends/add', { method: 'POST', body: { nick: nick } });
+      input.value = '';
+      await loadFriends();
+    } catch (e) {
+      errEl.textContent = e.message || 'Не удалось добавить';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Добавить';
+    }
+  }
+
+  async function removeFriend(nick) {
+    if (!confirm('Удалить «'+nick+'» из друзей?')) return;
+    try {
+      await api('/api/friends/'+encodeURIComponent(nick), { method: 'DELETE' });
+      await loadFriends();
+    } catch (e) {
+      alert(e.message || 'Ошибка удаления');
+    }
+  }
+
+  function setupFriendsTab() {
+    var addBtn = $('f-add');
+    var input = $('f-nick');
+    if (addBtn) addBtn.onclick = addFriend;
+    if (input) input.onkeydown = function(e){ if (e.key === 'Enter') addFriend(); };
+
+    loadFriends();
+    stopFriendsRefresh();
+    friendsRefreshTimer = setInterval(loadFriends, 30000);
+  }
+
+  // ===== HEARTBEAT =====
+  function startHeartbeat() {
+    if (!me) return;
+    var beat = function(){
+      if (!token) return;
+      fetch('/api/presence/heartbeat', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+      }).catch(function(){});
+    };
+    beat();
+    setInterval(beat, 120000);
+  }
 
   function renderProfile(){
     var b = $('pbox');
     renderNav();
+    stopFriendsRefresh();
 
-    // --- Не авторизован ---
     if (!me) {
-      // Шаг 2: ввод кода
       if (mode === 'up' && regStep === 'code') {
         b.innerHTML = '<div class="auth card">'+
           '<h2>Проверьте почту</h2>'+
@@ -296,7 +420,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
         return;
       }
 
-      // Шаг 1: форма
       b.innerHTML='<div class="auth card"><h2>Аккаунт</h2><p class="sub">Войди или создай профиль.</p>'+
       '<div class="sw2"><button data-m="in" class="'+(mode==='in'?'on':'')+'">Вход</button><button data-m="up" class="'+(mode==='up'?'on':'')+'">Регистрация</button></div>'+
       '<label for="a-nick">Ник</label><input type="text" id="a-nick" maxlength="16" autocomplete="username" spellcheck="false">'+
@@ -313,7 +436,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
         i.onkeydown=function(e){ if(e.key==='Enter') submit(); };
       });
 
-      // Восстановим введённые данные при возврате назад
       if (pendingReg && mode === 'up') {
         $('a-nick').value = pendingReg.nick || '';
         $('a-email').value = pendingReg.email || '';
@@ -322,9 +444,17 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
       return;
     }
 
-    // --- Авторизован ---
-    var T=[['me','Профиль'],['sub','Подписка'],['dl','Лаунчер']],h;
-    if (ptab === 'sub') {
+    var T=[['me','Профиль'],['friends','Друзья'],['sub','Подписка'],['dl','Лаунчер']],h;
+    if (ptab === 'friends') {
+      h = '<h2>Друзья</h2>'+
+          '<p class="sub">Список друзей и их статус.</p>'+
+          '<div class="friends-add">'+
+            '<input type="text" id="f-nick" placeholder="Ник друга" maxlength="16" autocomplete="off" spellcheck="false">'+
+            '<button class="btn fill" id="f-add">Добавить</button>'+
+          '</div>'+
+          '<div class="err" id="f-err"></div>'+
+          '<div id="f-list"><p class="hint">Загрузка…</p></div>';
+    } else if (ptab === 'sub') {
       h='<h2>Подписка</h2><p class="sub">Сейчас: <span class="pill">'+esc(me.plan||'Free')+'</span></p><p class="hint">Оплата пока не подключена.</p>';
     } else if (ptab === 'dl') {
       h='<h2>Лаунчер</h2><p class="sub">Скачай лаунчер и войди под своим аккаунтом.</p>'+
@@ -338,6 +468,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     }
     b.innerHTML='<div class="pl"><aside class="side">'+T.map(function(t){return '<button data-t="'+t[0]+'" class="'+(ptab===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('')+'</aside><div class="card">'+h+'</div></div>';
     b.querySelectorAll('.side button').forEach(function(x){x.onclick=function(){ptab=x.dataset.t;renderProfile()}});
+
     if ($('skin')) {
       $('skin').onclick = function(){ $('file').click(); };
       $('file').onchange = function(e){ loadSkin(e.target.files[0]); };
@@ -351,10 +482,11 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
         } catch(e) { alert(e.message); }
       };
     }
-  }
 
-  // Вкладка Профиль (у авторизованного) — переменная для текущей вкладки
-  var ptab='me';
+    if (ptab === 'friends' && $('f-list')) {
+      setupFriendsTab();
+    }
+  }
 
   function loadSkin(f) {
     if (!f) return;
@@ -390,14 +522,12 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     } catch(e) { alert(e.message); }
   }
 
-  // --- Основная кнопка: Вход / Регистрация ---
   async function submit() {
     var nick = $('a-nick').value.trim();
     var pw = $('a-pw').value;
     var err = $('err');
     err.textContent = '';
 
-    // --- ВХОД ---
     if (mode === 'in') {
       try {
         var data = await api('/api/auth/login', { method: 'POST', body: { nick: nick, password: pw } });
@@ -405,12 +535,12 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
         localStorage.setItem('tdlc_token', token);
         me = data.user;
         if (me && me.skin) await extractFace(me.skin);
+        startHeartbeat();
         renderProfile();
       } catch (e) { err.textContent = e.message || 'Ошибка'; }
       return;
     }
 
-    // --- РЕГИСТРАЦИЯ: шаг 1 — отправка кода ---
     var email = $('a-email').value.trim();
     if (!nick) { err.textContent = 'Введите ник'; return; }
     if (!/^[A-Za-z0-9_]{3,16}$/.test(nick)) { err.textContent = 'Ник: 3–16 символов, латиница, цифры и _'; return; }
@@ -433,7 +563,6 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     }
   }
 
-  // --- Подтверждение кода ---
   async function confirmCode() {
     var code = $('a-code').value.trim();
     var err = $('err');
@@ -460,6 +589,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
       pendingReg = null;
       regStep = 'form';
       if (me && me.skin) await extractFace(me.skin);
+      startHeartbeat();
       renderProfile();
     } catch (e) {
       err.textContent = e.message || 'Неверный код';
@@ -474,6 +604,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     localStorage.removeItem('tdlc_token');
     ptab = 'me';
     mode = 'in';
+    stopFriendsRefresh();
     renderProfile();
   }
 
@@ -489,6 +620,7 @@ html{scroll-behavior:smooth;scroll-padding-top:82px}
     }
     renderNav();
     route();
+    if (me) startHeartbeat();
   }
   boot();
 
