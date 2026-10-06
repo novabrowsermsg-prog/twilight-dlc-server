@@ -1,19 +1,13 @@
 const { Pool } = require("pg");
 
-const rawUrl = process.env.DATABASE_URL || "";
-
-// Определяем, нужен ли SSL: локальный Postgres — без SSL, облачный — с SSL
-const isLocal =
-  rawUrl.includes("localhost") ||
-  rawUrl.includes("127.0.0.1") ||
-  rawUrl.includes("0.0.0.0");
-
-// Убираем sslmode из URL, если он там есть (Aiven иногда кладёт)
-const connectionString = rawUrl.replace(/[?&]sslmode=[^&]*/g, "");
+const connectionString = (process.env.DATABASE_URL || "").replace(
+  /[?&]sslmode=[^&]*/g,
+  ""
+);
 
 const pool = new Pool({
   connectionString,
-  ssl: isLocal ? false : { rejectUnauthorized: false },
+  ssl: { rejectUnauthorized: false },
 });
 
 async function initDb() {
@@ -57,6 +51,7 @@ async function initDb() {
     );
   `);
 
+  // ===== Друзья (принятые) =====
   await pool.query(`
     CREATE TABLE IF NOT EXISTS friends (
       id SERIAL PRIMARY KEY,
@@ -72,6 +67,28 @@ async function initDb() {
       ON friends (user_nick);
   `);
 
+  // ===== Запросы в друзья =====
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id SERIAL PRIMARY KEY,
+      from_nick TEXT NOT NULL,
+      to_nick TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      UNIQUE (from_nick, to_nick)
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_friend_requests_to
+      ON friend_requests (to_nick);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_friend_requests_from
+      ON friend_requests (from_nick);
+  `);
+
+  // ===== Онлайн-статус =====
   await pool.query(`
     CREATE TABLE IF NOT EXISTS last_seen (
       nick TEXT PRIMARY KEY,

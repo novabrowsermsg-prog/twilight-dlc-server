@@ -13,12 +13,10 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const BASE_URL =
   process.env.BASE_URL || "https://twilight-dlc-server.onrender.com";
 
-// ---------- Brevo (email через HTTP API) ----------
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL;
 const BREVO_SENDER_NAME = "twilightDLC";
 
-// ---------- Middleware ----------
 app.use(express.json({ limit: "5mb" }));
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -59,7 +57,7 @@ function uuidNoDashes(name) {
   return offlinePlayerId(name).replace(/-/g, "");
 }
 
-// ---------- Send email via Brevo HTTP API ----------
+// ---------- Brevo ----------
 async function sendVerificationEmail(email, code) {
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -92,7 +90,7 @@ async function sendVerificationEmail(email, code) {
   }
 }
 
-// ---------- Профиль сборки ----------
+// ---------- Profile ----------
 app.get("/minecraft/api/v1/profile", (req, res) => {
   fs.readFile(path.join(__dirname, "profile.json"), "utf8", (err, data) => {
     if (err) return res.status(404).json({ error: "Profile not found" });
@@ -100,7 +98,7 @@ app.get("/minecraft/api/v1/profile", (req, res) => {
   });
 });
 
-// ---------- Новости ----------
+// ---------- News ----------
 app.get("/api/news", (req, res) => {
   const file = path.join(PUBLIC_DIR, "news.json");
   fs.readFile(file, "utf8", (err, data) => {
@@ -113,7 +111,7 @@ app.get("/api/news", (req, res) => {
   });
 });
 
-// ---------- Манифест модов ----------
+// ---------- Mods ----------
 function sha1File(filePath) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash("sha1");
@@ -186,7 +184,7 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-// ---------- Send code (регистрация шаг 1) ----------
+// ---------- Send code ----------
 app.post("/api/auth/send-code", async (req, res) => {
   try {
     const { email } = req.body || {};
@@ -215,7 +213,7 @@ app.post("/api/auth/send-code", async (req, res) => {
   }
 });
 
-// ---------- Register (шаг 2) ----------
+// ---------- Register ----------
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { nick, password, email, code } = req.body || {};
@@ -354,8 +352,9 @@ app.post("/api/auth/logout", authMiddleware, async (req, res) => {
 // FRIENDS
 // ============================================================
 
-const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 5 минут — считаем онлайн
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
+// --- Список друзей ---
 app.get("/api/friends", authMiddleware, async (req, res) => {
   try {
     const rows = await pool.query(
@@ -364,6 +363,7 @@ app.get("/api/friends", authMiddleware, async (req, res) => {
          u.uid,
          u.plan,
          u.skin,
+         u.bio,
          ls.last_seen_at
        FROM friends f
        LEFT JOIN users u ON u.nick = f.friend_nick
@@ -379,6 +379,7 @@ app.get("/api/friends", authMiddleware, async (req, res) => {
       uid: r.uid || r.nick,
       plan: r.plan || "Free",
       skin: r.skin || null,
+      bio: r.bio || "",
       online:
         r.last_seen_at != null &&
         now - Number(r.last_seen_at) < ONLINE_WINDOW_MS,
@@ -392,7 +393,60 @@ app.get("/api/friends", authMiddleware, async (req, res) => {
   }
 });
 
-app.post("/api/friends/add", authMiddleware, async (req, res) => {
+// --- Входящие запросы ---
+app.get("/api/friends/requests", authMiddleware, async (req, res) => {
+  try {
+    const rows = await pool.query(
+      `SELECT r.from_nick AS nick, u.uid, u.skin, u.bio, r.created_at
+       FROM friend_requests r
+       LEFT JOIN users u ON u.nick = r.from_nick
+       WHERE r.to_nick = $1
+       ORDER BY r.created_at DESC`,
+      [req.user.nick]
+    );
+    res.json(
+      rows.rows.map((r) => ({
+        nick: r.nick,
+        uid: r.uid || r.nick,
+        skin: r.skin || null,
+        bio: r.bio || "",
+        createdAt: Number(r.created_at),
+      }))
+    );
+  } catch (e) {
+    console.error("GET /api/friends/requests error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// --- Исходящие запросы ---
+app.get("/api/friends/requests/outgoing", authMiddleware, async (req, res) => {
+  try {
+    const rows = await pool.query(
+      `SELECT r.to_nick AS nick, u.uid, u.skin, u.bio, r.created_at
+       FROM friend_requests r
+       LEFT JOIN users u ON u.nick = r.to_nick
+       WHERE r.from_nick = $1
+       ORDER BY r.created_at DESC`,
+      [req.user.nick]
+    );
+    res.json(
+      rows.rows.map((r) => ({
+        nick: r.nick,
+        uid: r.uid || r.nick,
+        skin: r.skin || null,
+        bio: r.bio || "",
+        createdAt: Number(r.created_at),
+      }))
+    );
+  } catch (e) {
+    console.error("GET /api/friends/requests/outgoing error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// --- Отправить запрос ---
+app.post("/api/friends/request", authMiddleware, async (req, res) => {
   try {
     const { nick } = req.body || {};
     if (typeof nick !== "string" || !nick.trim()) {
@@ -412,29 +466,140 @@ app.post("/api/friends/add", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "Игрок не найден" });
     }
 
-    const now = Date.now();
+    const alreadyFriends = await pool.query(
+      `SELECT 1 FROM friends WHERE user_nick = $1 AND friend_nick = $2`,
+      [req.user.nick, target]
+    );
+    if (alreadyFriends.rows.length > 0) {
+      return res.status(409).json({ error: "Уже в друзьях" });
+    }
 
-    try {
+    // Встречный запрос — сразу друзья
+    const reciprocal = await pool.query(
+      `SELECT 1 FROM friend_requests
+       WHERE from_nick = $1 AND to_nick = $2`,
+      [target, req.user.nick]
+    );
+    if (reciprocal.rows.length > 0) {
+      const now = Date.now();
       await pool.query(
         `INSERT INTO friends (user_nick, friend_nick, created_at)
          VALUES ($1, $2, $3), ($2, $1, $3)
          ON CONFLICT DO NOTHING`,
         [req.user.nick, target, now]
       );
-    } catch (e) {
-      if (e.code === "23505") {
-        return res.status(409).json({ error: "Уже в друзьях" });
-      }
-      throw e;
+      await pool.query(
+        `DELETE FROM friend_requests
+         WHERE (from_nick = $1 AND to_nick = $2)
+            OR (from_nick = $2 AND to_nick = $1)`,
+        [req.user.nick, target]
+      );
+      return res.json({ ok: true, accepted: true, nick: target });
     }
+
+    const sent = await pool.query(
+      `SELECT 1 FROM friend_requests
+       WHERE from_nick = $1 AND to_nick = $2`,
+      [req.user.nick, target]
+    );
+    if (sent.rows.length > 0) {
+      return res.status(409).json({ error: "Запрос уже отправлен" });
+    }
+
+    await pool.query(
+      `INSERT INTO friend_requests (from_nick, to_nick, created_at)
+       VALUES ($1, $2, $3)`,
+      [req.user.nick, target, Date.now()]
+    );
 
     res.json({ ok: true, nick: target });
   } catch (e) {
-    console.error("POST /api/friends/add error:", e);
+    console.error("POST /api/friends/request error:", e);
     res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 
+// --- Принять запрос ---
+app.post("/api/friends/accept", authMiddleware, async (req, res) => {
+  try {
+    const { nick } = req.body || {};
+    if (typeof nick !== "string" || !nick.trim()) {
+      return res.status(400).json({ error: "Введите ник" });
+    }
+    const from = nick.trim().toLowerCase();
+
+    const reqRow = await pool.query(
+      `SELECT 1 FROM friend_requests
+       WHERE from_nick = $1 AND to_nick = $2`,
+      [from, req.user.nick]
+    );
+    if (reqRow.rows.length === 0) {
+      return res.status(404).json({ error: "Запрос не найден" });
+    }
+
+    const now = Date.now();
+    await pool.query(
+      `INSERT INTO friends (user_nick, friend_nick, created_at)
+       VALUES ($1, $2, $3), ($2, $1, $3)
+       ON CONFLICT DO NOTHING`,
+      [req.user.nick, from, now]
+    );
+    await pool.query(
+      `DELETE FROM friend_requests
+       WHERE (from_nick = $1 AND to_nick = $2)
+          OR (from_nick = $2 AND to_nick = $1)`,
+      [req.user.nick, from]
+    );
+
+    res.json({ ok: true, nick: from });
+  } catch (e) {
+    console.error("POST /api/friends/accept error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// --- Отклонить входящий ---
+app.post("/api/friends/decline", authMiddleware, async (req, res) => {
+  try {
+    const { nick } = req.body || {};
+    if (typeof nick !== "string" || !nick.trim()) {
+      return res.status(400).json({ error: "Введите ник" });
+    }
+    const from = nick.trim().toLowerCase();
+
+    await pool.query(
+      `DELETE FROM friend_requests
+       WHERE from_nick = $1 AND to_nick = $2`,
+      [from, req.user.nick]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("POST /api/friends/decline error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// --- Отменить свой исходящий ---
+app.delete("/api/friends/request/:nick", authMiddleware, async (req, res) => {
+  try {
+    const target = String(req.params.nick || "").toLowerCase();
+    if (!target) return res.status(400).json({ error: "Ник обязателен" });
+
+    await pool.query(
+      `DELETE FROM friend_requests
+       WHERE from_nick = $1 AND to_nick = $2`,
+      [req.user.nick, target]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("DELETE /api/friends/request error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// --- Удалить друга ---
 app.delete("/api/friends/:nick", authMiddleware, async (req, res) => {
   try {
     const target = String(req.params.nick || "").toLowerCase();
@@ -454,7 +619,7 @@ app.delete("/api/friends/:nick", authMiddleware, async (req, res) => {
   }
 });
 
-// heartbeat — клиент стучится раз в 1–2 минуты
+// --- Heartbeat ---
 app.post("/api/presence/heartbeat", authMiddleware, async (req, res) => {
   try {
     await pool.query(
