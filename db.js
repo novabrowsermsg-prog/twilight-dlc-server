@@ -1,13 +1,19 @@
 const { Pool } = require("pg");
 
-const connectionString = (process.env.DATABASE_URL || "").replace(
-  /[?&]sslmode=[^&]*/g,
-  ""
-);
+const rawUrl = process.env.DATABASE_URL || "";
+
+// Определяем, нужен ли SSL: локальный Postgres — без SSL, облачный — с SSL
+const isLocal =
+  rawUrl.includes("localhost") ||
+  rawUrl.includes("127.0.0.1") ||
+  rawUrl.includes("0.0.0.0");
+
+// Убираем sslmode из URL, если он там есть (Aiven иногда кладёт)
+const connectionString = rawUrl.replace(/[?&]sslmode=[^&]*/g, "");
 
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false },
+  ssl: isLocal ? false : { rejectUnauthorized: false },
 });
 
 async function initDb() {
@@ -48,6 +54,28 @@ async function initDb() {
       email TEXT PRIMARY KEY,
       code TEXT,
       expires_at BIGINT
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS friends (
+      id SERIAL PRIMARY KEY,
+      user_nick TEXT NOT NULL,
+      friend_nick TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      UNIQUE (user_nick, friend_nick)
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_friends_user
+      ON friends (user_nick);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS last_seen (
+      nick TEXT PRIMARY KEY,
+      last_seen_at BIGINT NOT NULL
     );
   `);
 

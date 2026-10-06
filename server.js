@@ -222,7 +222,9 @@ app.post("/api/auth/register", async (req, res) => {
     if (!nick || !password || !email || !code)
       return res.status(400).json({ error: "Все поля обязательны" });
     if (!/^[A-Za-z0-9_]{3,16}$/.test(nick))
-      return res.status(400).json({ error: "Ник: 3–16 символов, латиница, цифры и _" });
+      return res
+        .status(400)
+        .json({ error: "Ник: 3–16 символов, латиница, цифры и _" });
     if (password.length < 6)
       return res.status(400).json({ error: "Пароль минимум 6 символов" });
 
@@ -346,6 +348,126 @@ app.put("/api/auth/profile", authMiddleware, async (req, res) => {
 app.post("/api/auth/logout", authMiddleware, async (req, res) => {
   await pool.query("DELETE FROM sessions WHERE token = $1", [req.token]);
   res.json({ ok: true });
+});
+
+// ============================================================
+// FRIENDS
+// ============================================================
+
+const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 5 минут — считаем онлайн
+
+app.get("/api/friends", authMiddleware, async (req, res) => {
+  try {
+    const rows = await pool.query(
+      `SELECT
+         f.friend_nick AS nick,
+         u.uid,
+         u.plan,
+         u.skin,
+         ls.last_seen_at
+       FROM friends f
+       LEFT JOIN users u ON u.nick = f.friend_nick
+       LEFT JOIN last_seen ls ON ls.nick = f.friend_nick
+       WHERE f.user_nick = $1
+       ORDER BY ls.last_seen_at DESC NULLS LAST, f.friend_nick ASC`,
+      [req.user.nick]
+    );
+
+    const now = Date.now();
+    const list = rows.rows.map((r) => ({
+      nick: r.nick,
+      uid: r.uid || r.nick,
+      plan: r.plan || "Free",
+      skin: r.skin || null,
+      online:
+        r.last_seen_at != null &&
+        now - Number(r.last_seen_at) < ONLINE_WINDOW_MS,
+      lastSeen: r.last_seen_at ? Number(r.last_seen_at) : null,
+    }));
+
+    res.json(list);
+  } catch (e) {
+    console.error("GET /api/friends error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+app.post("/api/friends/add", authMiddleware, async (req, res) => {
+  try {
+    const { nick } = req.body || {};
+    if (typeof nick !== "string" || !nick.trim()) {
+      return res.status(400).json({ error: "Введите ник" });
+    }
+
+    const target = nick.trim().toLowerCase();
+    if (target === req.user.nick) {
+      return res.status(400).json({ error: "Это вы" });
+    }
+
+    const exists = await pool.query(
+      "SELECT nick FROM users WHERE nick = $1",
+      [target]
+    );
+    if (exists.rows.length === 0) {
+      return res.status(404).json({ error: "Игрок не найден" });
+    }
+
+    const now = Date.now();
+
+    try {
+      await pool.query(
+        `INSERT INTO friends (user_nick, friend_nick, created_at)
+         VALUES ($1, $2, $3), ($2, $1, $3)
+         ON CONFLICT DO NOTHING`,
+        [req.user.nick, target, now]
+      );
+    } catch (e) {
+      if (e.code === "23505") {
+        return res.status(409).json({ error: "Уже в друзьях" });
+      }
+      throw e;
+    }
+
+    res.json({ ok: true, nick: target });
+  } catch (e) {
+    console.error("POST /api/friends/add error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+app.delete("/api/friends/:nick", authMiddleware, async (req, res) => {
+  try {
+    const target = String(req.params.nick || "").toLowerCase();
+    if (!target) return res.status(400).json({ error: "Ник обязателен" });
+
+    await pool.query(
+      `DELETE FROM friends
+       WHERE (user_nick = $1 AND friend_nick = $2)
+          OR (user_nick = $2 AND friend_nick = $1)`,
+      [req.user.nick, target]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("DELETE /api/friends error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// heartbeat — клиент стучится раз в 1–2 минуты
+app.post("/api/presence/heartbeat", authMiddleware, async (req, res) => {
+  try {
+    await pool.query(
+      `INSERT INTO last_seen (nick, last_seen_at)
+       VALUES ($1, $2)
+       ON CONFLICT (nick) DO UPDATE SET last_seen_at = $2`,
+      [req.user.nick, Date.now()]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("POST /api/presence/heartbeat error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
 });
 
 // ---------- Skin PNG ----------
