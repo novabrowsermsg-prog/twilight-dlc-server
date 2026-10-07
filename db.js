@@ -96,6 +96,42 @@ async function initDb() {
     );
   `);
 
+  // ===== Сессии мода (где сейчас играет игрок) =====
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mc_sessions (
+      nick TEXT PRIMARY KEY,
+      server_ip TEXT NOT NULL,
+      server_port INTEGER NOT NULL DEFAULT 25565,
+      mc_version TEXT,
+      updated_at BIGINT NOT NULL
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_mc_sessions_updated
+      ON mc_sessions (updated_at DESC);
+  `);
+
+  // ===== Приглашения от мода =====
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mod_invites (
+      id SERIAL PRIMARY KEY,
+      from_nick TEXT NOT NULL,
+      to_nick TEXT NOT NULL,
+      server_ip TEXT NOT NULL,
+      server_port INTEGER NOT NULL DEFAULT 25565,
+      server_name TEXT,
+      created_at BIGINT NOT NULL,
+      expires_at BIGINT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending'
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_mod_invites_to_pending
+      ON mod_invites (to_nick, status, expires_at);
+  `);
+
   console.log("Database initialized");
 }
 

@@ -474,7 +474,6 @@ app.post("/api/friends/request", authMiddleware, async (req, res) => {
       return res.status(409).json({ error: "Уже в друзьях" });
     }
 
-    // Встречный запрос — сразу друзья
     const reciprocal = await pool.query(
       `SELECT 1 FROM friend_requests
        WHERE from_nick = $1 AND to_nick = $2`,
@@ -631,6 +630,256 @@ app.post("/api/presence/heartbeat", authMiddleware, async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error("POST /api/presence/heartbeat error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// ============================================================
+// MOD BRIDGE — сессии и приглашения из мода Minecraft
+// ============================================================
+
+const MOD_SESSION_TTL_MS = 2 * 60 * 1000;
+const MOD_INVITE_TTL_MS = 60 * 1000;
+
+app.post("/api/mod/session", authMiddleware, async (req, res) => {
+  try {
+    const { nick, serverIp, serverPort, mcVersion } = req.body || {};
+    const target = String(nick || "").trim().toLowerCase();
+    if (!target || target !== req.user.nick) {
+      return res.status(403).json({ error: "nick mismatch" });
+    }
+    if (typeof serverIp !== "string" || !serverIp.trim()) {
+      return res.status(400).json({ error: "serverIp required" });
+    }
+
+    const port = Number(serverPort) || 25565;
+    if (port < 1 || port > 65535) {
+      return res.status(400).json({ error: "bad port" });
+    }
+
+    await pool.query(
+      `INSERT INTO mc_sessions (nick, server_ip, server_port, mc_version, updated_at)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (nick) DO UPDATE
+       SET server_ip = $2, server_port = $3, mc_version = $4, updated_at = $5`,
+      [
+        target,
+        serverIp.trim().slice(0, 200),
+        port,
+        typeof mcVersion === "string" ? mcVersion.slice(0, 40) : null,
+        Date.now(),
+      ]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("POST /api/mod/session error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+app.post("/api/mod/session/clear", authMiddleware, async (req, res) => {
+  try {
+    const { nick } = req.body || {};
+    const target = String(nick || "").trim().toLowerCase();
+    if (!target || target !== req.user.nick) {
+      return res.status(403).json({ error: "nick mismatch" });
+    }
+    await pool.query(`DELETE FROM mc_sessions WHERE nick = $1`, [target]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("POST /api/mod/session/clear error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+app.get("/api/mod/session/:nick", authMiddleware, async (req, res) => {
+  try {
+    const target = String(req.params.nick || "").trim().toLowerCase();
+    const r = await pool.query(
+      `SELECT server_ip, server_port, mc_version, updated_at
+       FROM mc_sessions WHERE nick = $1`,
+      [target]
+    );
+    if (r.rows.length === 0) return res.json({ online: false });
+
+    const row = r.rows[0];
+    const fresh = Date.now() - Number(row.updated_at) < MOD_SESSION_TTL_MS;
+    if (!fresh) {
+      await pool.query(`DELETE FROM mc_sessions WHERE nick = $1`, [target]);
+      return res.json({ online: false });
+    }
+
+    res.json({
+      online: true,
+      serverIp: row.server_ip,
+      serverPort: row.server_port,
+      mcVersion: row.mc_version,
+    });
+  } catch (e) {
+    console.error("GET /api/mod/session error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+app.post("/api/mod/invite", authMiddleware, async (req, res) => {
+  try {
+    const { nick, serverIp, serverPort, serverName } = req.body || {};
+    const target = String(nick || "").trim().toLowerCase();
+    if (!target || target === req.user.nick) {
+      return res.status(400).json({ error: "bad target" });
+    }
+
+    const exists = await pool.query(`SELECT nick FROM users WHERE nick = $1`, [target]);
+    if (exists.rows.length === 0) {
+      return res.status(404).json({ error: "Игрок не найден" });
+    }
+    const isFriend = await pool.query(
+      `SELECT 1 FROM friends WHERE user_nick = $1 AND friend_nick = $2`,
+      [req.user.nick, target]
+    );
+    if (isFriend.rows.length === 0) {
+      return res.status(403).json({ error: "Только для друзей" });
+    }
+
+    let ip = typeof serverIp === "string" ? serverIp.trim() : "";
+    let port = Number(serverPort) || 25565;
+
+    if (!ip) {
+      const sess = await pool.query(
+        `SELECT server_ip, server_port, updated_at FROM mc_sessions WHERE nick = $1`,
+        [req.user.nick]
+      );
+      if (sess.rows.length === 0) {
+        return res.status(400).json({ error: "Вы не в игре" });
+      }
+      if (Date.now() - Number(sess.rows[0].updated_at || 0) > MOD_SESSION_TTL_MS) {
+        return res.status(400).json({ error: "Сессия устарела" });
+      }
+      ip = sess.rows[0].server_ip;
+      port = sess.rows[0].server_port;
+    }
+
+    const now = Date.now();
+    const expiresAt = now + MOD_INVITE_TTL_MS;
+
+    await pool.query(
+      `DELETE FROM mod_invites
+       WHERE from_nick = $1 AND to_nick = $2 AND status = 'pending'`,
+      [req.user.nick, target]
+    );
+
+    await pool.query(
+      `INSERT INTO mod_invites
+         (from_nick, to_nick, server_ip, server_port, server_name, created_at, expires_at, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
+      [
+        req.user.nick,
+        target,
+        ip.slice(0, 200),
+        port,
+        typeof serverName === "string" ? serverName.trim().slice(0, 60) : null,
+        now,
+        expiresAt,
+      ]
+    );
+
+    res.json({ ok: true, expiresAt });
+  } catch (e) {
+    console.error("POST /api/mod/invite error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+app.get("/api/mod/invites", authMiddleware, async (req, res) => {
+  try {
+    const nick = String(req.query.nick || "").trim().toLowerCase();
+    if (nick !== req.user.nick) {
+      return res.status(403).json({ error: "nick mismatch" });
+    }
+
+    const now = Date.now();
+
+    await pool.query(
+      `UPDATE mod_invites SET status = 'expired'
+       WHERE status = 'pending' AND expires_at < $1`,
+      [now]
+    );
+
+    const r = await pool.query(
+      `SELECT id, from_nick, server_ip, server_port, server_name
+       FROM mod_invites
+       WHERE to_nick = $1 AND status = 'pending' AND expires_at > $2
+       ORDER BY created_at DESC LIMIT 1`,
+      [nick, now]
+    );
+
+    if (r.rows.length === 0) {
+      return res.json({ id: null });
+    }
+
+    const row = r.rows[0];
+    res.json({
+      id: row.id,
+      from: row.from_nick,
+      serverIp: row.server_ip,
+      serverPort: row.server_port,
+      serverName: row.server_name,
+    });
+  } catch (e) {
+    console.error("GET /api/mod/invites error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+app.post("/api/mod/invites/:id/accept", authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { nick } = req.body || {};
+    const target = String(nick || "").trim().toLowerCase();
+    if (target !== req.user.nick) {
+      return res.status(403).json({ error: "nick mismatch" });
+    }
+
+    const r = await pool.query(
+      `UPDATE mod_invites SET status = 'accepted'
+       WHERE id = $1 AND to_nick = $2 AND status = 'pending'
+       RETURNING server_ip, server_port`,
+      [id, target]
+    );
+    if (r.rows.length === 0) {
+      return res.status(404).json({ error: "not found" });
+    }
+
+    res.json({
+      ok: true,
+      serverIp: r.rows[0].server_ip,
+      serverPort: r.rows[0].server_port,
+    });
+  } catch (e) {
+    console.error("POST accept error:", e);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+app.post("/api/mod/invites/:id/decline", authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { nick } = req.body || {};
+    const target = String(nick || "").trim().toLowerCase();
+    if (target !== req.user.nick) {
+      return res.status(403).json({ error: "nick mismatch" });
+    }
+
+    await pool.query(
+      `UPDATE mod_invites SET status = 'declined'
+       WHERE id = $1 AND to_nick = $2 AND status = 'pending'`,
+      [id, target]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("POST decline error:", e);
     res.status(500).json({ error: "Ошибка сервера" });
   }
 });
